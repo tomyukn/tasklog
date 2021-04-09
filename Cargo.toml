@@ -1,0 +1,18 @@
+[package]
+name = "tasklog"
+version = "0.1.0"
+authors = ["tomyukn <5608467+tomyukn@users.noreply.github.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0"
+chrono = "0.4.19"
+clap = "3.0.0-beta.2"
+getset = "0.1.1"
+regex = "1"
+
+[dependencies.rusqlite]
+version = "0.24.2"
+features = ["bundled"]
