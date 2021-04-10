@@ -1,0 +1,38 @@
+name: Rust
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - name: Get the repository name
+      id: get_repository_name
+      run: echo "::set-output name=REP_NAME::${GITHUB_REPOSITORY#*/}"
+    - name: Get the version
+      id: get_version
+      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+    - uses: actions/checkout@v2
+    - name: Build
+      run: |
+        cargo build --release --locked
+        cp target/release/${REP_NAME}.exe .
+        7z a -tzip ${REP_NAME}-${VERSION}-x86_64-pc-windows-msvc.zip README.md ${REP_NAME}.exe
+      env:
+        VERSION: ${{ steps.get_version.outputs.VERSION }}
+        REP_NAME: ${{ steps.get_repository_name.outputs.REP_NAME }}
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: "*.zip"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
