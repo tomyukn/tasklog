@@ -1,6 +1,6 @@
 # tasklog
 
-Loging times.
+Logging times.
 
 ## Examples
 
