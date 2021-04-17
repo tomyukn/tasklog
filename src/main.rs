@@ -264,8 +264,10 @@ fn main() -> Result<()> {
 
             // show details
             let tasks_with_num = db.get_tasks(opts.all, Some(date))?;
+            println!("List");
+            println!("----");
             println!(
-                "{:<10}  {:<2}  {:<5}  {:<5}  {:<8}  {:<20}",
+                "{:<10}  {:<2}  {:<5} - {:<5}  {:<8}  {:<20}",
                 "Date", "No", "Start", "End", "Duration", "Task"
             );
 
@@ -274,7 +276,7 @@ fn main() -> Result<()> {
 
             for (n, task) in tasks_with_num {
                 println!(
-                    "{:<10}  {:<2}  {:<5}  {:<5}  {:<8}  {:<20}",
+                    "{:<10}  {:<2}  {:<5} - {:<5}  {:<8}  {:<20}",
                     task.working_date().to_string(),
                     n,
                     task.start_time().to_string_hhmm(),
@@ -298,9 +300,9 @@ fn main() -> Result<()> {
                 if let Some(summary) = TaskList::new(tasks).summary() {
                     println!("\nSummary");
                     println!("-------");
-                    println!("   Start  {}", summary.start().to_string_hhmm());
-                    println!("     End  {}", summary.end().to_string_hhmm());
-                    println!("Duration  {}\n", summary.duration_total().to_string_hhmm());
+                    println!("   Start: {}", summary.start().to_string_hhmm());
+                    println!("     End: {}", summary.end().to_string_hhmm());
+                    println!("Duration: {}\n", summary.duration_total().to_string_hhmm());
 
                     // total time
                     let mut names: Vec<String> =
@@ -316,7 +318,7 @@ fn main() -> Result<()> {
                     }
 
                     // break time
-                    println!("\nBreak");
+                    println!("\n[Break]");
                     for break_time in breaks {
                         println!(
                             "{} - {}",
@@ -327,6 +329,7 @@ fn main() -> Result<()> {
                             }
                         );
                     }
+                    println!("")
                 }
             }
         }
