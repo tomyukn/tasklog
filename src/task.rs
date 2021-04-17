@@ -229,7 +229,7 @@ impl TaskTime {
     /// Create a `TaskTime` from a ISO8601 datetime format.
     pub fn parse_from_string_iso8601(s: String) -> Result<Self> {
         match NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S") {
-            Ok(t) => Ok(TaskTime(t)),
+            Ok(t) => Ok(TaskTime(t.with_second(0).unwrap())),
             Err(e) => Err(anyhow!(e)),
         }
     }
