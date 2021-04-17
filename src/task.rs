@@ -79,10 +79,9 @@ impl Task {
     }
 
     pub fn duration_hhmm(&self) -> String {
-        if let Some(duration) = &self.duration() {
-            duration.to_string_hhmm()
-        } else {
-            String::from("")
+        match &self.duration() {
+            Some(duration) => duration.to_string_hhmm(),
+            None => String::from(""),
         }
     }
 }
