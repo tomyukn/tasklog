@@ -262,7 +262,7 @@ impl<'a, 'b> ops::Sub<&'a TaskTime> for &'b TaskTime {
     }
 }
 
-impl<'a, 'b> ops::Sub<TaskTime> for TaskTime {
+impl ops::Sub<TaskTime> for TaskTime {
     type Output = Duration;
 
     fn sub(self, other: TaskTime) -> Duration {
