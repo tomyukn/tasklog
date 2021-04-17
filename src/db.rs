@@ -52,12 +52,12 @@ impl Database {
 
     /// Check whether the tables are crated.
     pub fn is_prepared(&self) -> Result<bool> {
-        let count: u32 = self.conn.query_row(
+        let count = self.conn.query_row(
             "SELECT count(name) \
             FROM sqlite_master \
             WHERE type = 'table' and name in ('tasks', 'tasknames', 'manager')",
             NO_PARAMS,
-            |row| row.get(0),
+            |row| row.get::<_, u32>(0),
         )?;
 
         Ok(count == 3)
@@ -115,12 +115,12 @@ impl Database {
 
     /// Register a task into the database to be able to select easily.
     pub fn register_taskname(&mut self, task_name: &str) -> Result<()> {
-        let exist: rusqlite::Result<u32> = self.conn.query_row(
+        let exist = self.conn.query_row(
             "SELECT id \
             FROM tasknames \
             WHERE task_name = ?1",
             params![task_name],
-            |row| row.get(0),
+            |row| row.get::<_, u32>(0),
         );
 
         match exist {
@@ -156,12 +156,12 @@ impl Database {
 
     /// Delete a registered task name from the database.
     pub fn unregister_taskname(&mut self, task_name: &str) -> Result<()> {
-        let exist: rusqlite::Result<u32> = self.conn.query_row(
+        let exist = self.conn.query_row(
             "SELECT id \
             FROM tasknames \
             WHERE task_name = ?1",
             params![task_name],
-            |row| row.get(0),
+            |row| row.get::<_, u32>(0),
         );
 
         match exist {
@@ -198,12 +198,12 @@ impl Database {
 
     /// Get a task name by a sequence number.
     pub fn get_taskname(&self, number: u32) -> Result<String> {
-        let taskname: String = self.conn.query_row(
+        let taskname = self.conn.query_row(
             "SELECT task_name \
             FROM tasknames \
             WHERE seq_num = ?1",
             params![number],
-            |row| row.get(0),
+            |row| row.get::<_, String>(0),
         )?;
 
         Ok(taskname)
@@ -218,17 +218,17 @@ impl Database {
         )?;
 
         let rows = stmt.query_map(NO_PARAMS, |row| {
-            let seq_num: u32 = row.get(0)?;
-            let task_name: String = row.get(1)?;
+            let seq_num = row.get::<_, u32>(0)?;
+            let task_name = row.get::<_, String>(1)?;
             Ok((seq_num, task_name))
         })?;
 
-        let mut bag = Vec::new();
-        for x in rows {
-            bag.push(x?);
+        let mut tuples = Vec::new();
+        for tuple in rows {
+            tuples.push(tuple?);
         }
 
-        Ok(bag)
+        Ok(tuples)
     }
 
     /// Add a task log to the database
@@ -236,10 +236,9 @@ impl Database {
         let task_name = task.name();
         let working_date = task.working_date().to_string();
         let start_time = task.start_time().to_string();
-        let end_time = if let Some(time) = task.end_time() {
-            time.to_string()
-        } else {
-            String::from("")
+        let end_time = match task.end_time() {
+            Some(time) => time.to_string(),
+            None => String::from(""),
         };
 
         let tx = self.conn.transaction()?;
@@ -250,11 +249,11 @@ impl Database {
             params![task_name, working_date, start_time, end_time],
         )?;
 
-        let task_id: u32 = tx.query_row(
+        let task_id = tx.query_row(
             "SELECT max(id) \
             FROM tasks",
             NO_PARAMS,
-            |row| Ok(row.get_unwrap(0)),
+            |row| Ok(row.get_unwrap::<_, u32>(0)),
         )?;
 
         &tx.execute(
@@ -294,12 +293,12 @@ impl Database {
             WHERE id = ?1",
             params![id],
             |row| {
-                let id: u32 = row.get(0)?;
-                let name: String = row.get_unwrap(1);
-                let start_time: TaskTime =
-                    TaskTime::parse_from_string_iso8601(row.get_unwrap(2)).unwrap();
-                let end_time: Option<TaskTime> = {
-                    match TaskTime::parse_from_string_iso8601(row.get_unwrap(3)) {
+                let id = row.get::<_, u32>(0)?;
+                let name = row.get_unwrap::<_, String>(1);
+                let start_time =
+                    TaskTime::parse_from_string_iso8601(row.get_unwrap::<_, String>(2)).unwrap();
+                let end_time = {
+                    match TaskTime::parse_from_string_iso8601(row.get_unwrap::<_, String>(3)) {
                         Ok(t) => Some(t),
                         Err(_) => None,
                     }
@@ -313,11 +312,11 @@ impl Database {
 
     /// Get the current task id, which is recored on `manager` table, from the database.
     pub fn get_current_task_id(&self) -> Result<Option<u32>> {
-        let id_or_null: Option<u32> = self.conn.query_row(
+        let id_or_null = self.conn.query_row(
             "SELECT task_id \
             FROM manager",
             NO_PARAMS,
-            |row| row.get(0),
+            |row| row.get::<_, Option<u32>>(0),
         )?;
 
         Ok(id_or_null)
@@ -325,12 +324,12 @@ impl Database {
 
     /// Get a task id from the database by specifying the task list number and date.
     pub fn get_task_id_by_seqnum(&self, seq_num: u32, working_date: WorkDate) -> Result<u32> {
-        let id: u32 = self.conn.query_row(
+        let id = self.conn.query_row(
             "SELECT id \
             FROM tasks \
             WHERE seq_num = ?1 AND working_date = ?2",
             params![seq_num, working_date.to_string()],
-            |row| row.get(0),
+            |row| row.get::<_, u32>(0),
         )?;
 
         Ok(id)
@@ -355,26 +354,27 @@ impl Database {
 
         let mut stmt = self.conn.prepare(&sql)?;
         let rows = stmt.query_map(NO_PARAMS, |row| {
-            let seq_num: u32 = row.get_unwrap(0);
-            let id: u32 = row.get_unwrap(1);
-            let name: String = row.get_unwrap(2);
-            let start_time: TaskTime =
-                TaskTime::parse_from_string_iso8601(row.get_unwrap(3)).unwrap();
-            let end_time: Option<TaskTime> = {
-                match TaskTime::parse_from_string_iso8601(row.get_unwrap(4)) {
+            let seq_num = row.get_unwrap::<_, u32>(0);
+            let id = row.get_unwrap::<_, u32>(1);
+            let name = row.get_unwrap::<_, String>(2);
+            let start_time =
+                TaskTime::parse_from_string_iso8601(row.get_unwrap::<_, String>(3)).unwrap();
+            let end_time = {
+                match TaskTime::parse_from_string_iso8601(row.get_unwrap::<_, String>(4)) {
                     Ok(t) => Some(t),
                     Err(_) => None,
                 }
             };
+
             Ok((seq_num, Task::new(Some(id), name, start_time, end_time)))
         })?;
 
-        let mut v = Vec::new();
-        for x in rows {
-            v.push(x?);
+        let mut tuples = Vec::new();
+        for tuple in rows {
+            tuples.push(tuple?);
         }
 
-        Ok(v)
+        Ok(tuples)
     }
 
     /// Update a task log in the database.

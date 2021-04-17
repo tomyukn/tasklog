@@ -30,8 +30,6 @@ pub struct Task {
     id: Option<u32>,
     #[getset(get = "pub", set = "pub")]
     name: String,
-    #[getset(get = "pub")]
-    working_date: WorkDate,
     #[getset(get = "pub", set = "pub")]
     start_time: TaskTime,
     #[getset(get = "pub", set = "pub")]
@@ -46,12 +44,9 @@ impl Task {
         start_time: TaskTime,
         end_time: Option<TaskTime>,
     ) -> Self {
-        let working_date = WorkDate::from(start_time);
-
         Self {
             id,
             name,
-            working_date,
             start_time,
             end_time,
         }
@@ -73,16 +68,20 @@ impl Task {
         })
     }
 
+    /// Get the working date of the task.
+    pub fn working_date(&self) -> WorkDate {
+        WorkDate::from(self.start_time)
+    }
+
     /// Calculate the duration of the task.
     fn duration(&self) -> Option<Duration> {
         self.end_time.map(|t| &t - &self.start_time)
     }
 
     pub fn duration_hhmm(&self) -> String {
-        if let Some(duration) = &self.duration() {
-            duration.to_string_hhmm()
-        } else {
-            String::from("")
+        match &self.duration() {
+            Some(duration) => duration.to_string_hhmm(),
+            None => String::from(""),
         }
     }
 }
@@ -262,7 +261,7 @@ impl<'a, 'b> ops::Sub<&'a TaskTime> for &'b TaskTime {
     }
 }
 
-impl<'a, 'b> ops::Sub<TaskTime> for TaskTime {
+impl ops::Sub<TaskTime> for TaskTime {
     type Output = Duration;
 
     fn sub(self, other: TaskTime) -> Duration {
@@ -309,7 +308,6 @@ mod tests {
             Task {
                 id: None,
                 name: String::from("task a"),
-                working_date: WorkDate::from(String::from("2021-01-02")),
                 start_time: start_time,
                 end_time: None
             },
@@ -322,7 +320,6 @@ mod tests {
         let task = Task {
             id: None,
             name: String::from("task a"),
-            working_date: WorkDate::from(String::from("2021-01-02")),
             start_time: start_time,
             end_time: None,
         };
@@ -333,7 +330,6 @@ mod tests {
             Task {
                 id: None,
                 name: String::from("task a"),
-                working_date: WorkDate::from(String::from("2021-01-02")),
                 start_time: start_time,
                 end_time: Some(end_time1)
             },
