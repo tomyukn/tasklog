@@ -296,9 +296,9 @@ impl Database {
                 let id = row.get::<_, u32>(0)?;
                 let name = row.get_unwrap::<_, String>(1);
                 let start_time =
-                    TaskTime::parse_from_string_iso8601(row.get_unwrap::<_, String>(2)).unwrap();
+                    TaskTime::parse_from_str_iso8601(&row.get_unwrap::<_, String>(2)).unwrap();
                 let end_time = {
-                    match TaskTime::parse_from_string_iso8601(row.get_unwrap::<_, String>(3)) {
+                    match TaskTime::parse_from_str_iso8601(&row.get_unwrap::<_, String>(3)) {
                         Ok(t) => Some(t),
                         Err(_) => None,
                     }
@@ -358,9 +358,9 @@ impl Database {
             let id = row.get_unwrap::<_, u32>(1);
             let name = row.get_unwrap::<_, String>(2);
             let start_time =
-                TaskTime::parse_from_string_iso8601(row.get_unwrap::<_, String>(3)).unwrap();
+                TaskTime::parse_from_str_iso8601(&row.get_unwrap::<_, String>(3)).unwrap();
             let end_time = {
-                match TaskTime::parse_from_string_iso8601(row.get_unwrap::<_, String>(4)) {
+                match TaskTime::parse_from_str_iso8601(&row.get_unwrap::<_, String>(4)) {
                     Ok(t) => Some(t),
                     Err(_) => None,
                 }
@@ -725,11 +725,11 @@ mod tests {
         }
 
         assert_eq!(
-            db.get_task_id_by_seqnum(2, WorkDate::from(String::from("2021-01-01")))?,
+            db.get_task_id_by_seqnum(2, WorkDate::parse_from_str("2021-01-01")?)?,
             2
         );
         assert_eq!(
-            db.get_task_id_by_seqnum(1, WorkDate::from(String::from("2021-01-02")))?,
+            db.get_task_id_by_seqnum(1, WorkDate::parse_from_str("2021-01-02")?)?,
             3
         );
 
@@ -778,12 +778,12 @@ mod tests {
         db.add_task_entry(&task4)?;
 
         assert_eq!(
-            db.get_tasks(false, Some(WorkDate::from(String::from("2021-01-01"))))?,
+            db.get_tasks(false, Some(WorkDate::parse_from_str("2021-01-01")?))?,
             vec![(1, task1.clone()), (2, task2.clone())]
         );
 
         assert_eq!(
-            db.get_tasks(false, Some(WorkDate::from(String::from("2021-01-02"))))?,
+            db.get_tasks(false, Some(WorkDate::parse_from_str("2021-01-02")?))?,
             vec![(1, task3.clone()), (2, task4.clone())]
         );
 
