@@ -294,16 +294,163 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tasktime_to_string_hhmm() {
-        let t = TaskTime(chrono::NaiveDate::from_ymd(2015, 9, 18).and_hms(23, 56, 0));
+    fn test_tasktime_to_string_hhmm() {
+        let t = TaskTime(NaiveDate::from_ymd(2015, 9, 18).and_hms(23, 56, 0));
         assert_eq!(t.to_string_hhmm(), String::from("23:56"))
     }
 
     #[test]
-    fn tasktime_duration() {
-        let t1 = TaskTime(chrono::NaiveDate::from_ymd(2015, 9, 18).and_hms(23, 56, 0));
-        let t2 = TaskTime(chrono::NaiveDate::from_ymd(2015, 9, 19).and_hms(1, 10, 0));
-        assert_eq!(&t2 - &t1, chrono::Duration::minutes(74));
+    fn test_task_start() {
+        let start_time = TaskTime(NaiveDate::from_ymd(2021, 1, 2).and_hms(11, 6, 0));
+        let task = Task::start(String::from("task a"), start_time);
+        assert_eq!(
+            task,
+            Task {
+                id: None,
+                name: String::from("task a"),
+                working_date: WorkDate::from(String::from("2021-01-02")),
+                start_time: start_time,
+                end_time: None
+            },
+        );
+    }
+
+    #[test]
+    fn test_task_end() {
+        let start_time = TaskTime(NaiveDate::from_ymd(2021, 1, 2).and_hms(11, 6, 0));
+        let task = Task {
+            id: None,
+            name: String::from("task a"),
+            working_date: WorkDate::from(String::from("2021-01-02")),
+            start_time: start_time,
+            end_time: None,
+        };
+
+        let end_time1 = TaskTime(NaiveDate::from_ymd(2021, 1, 2).and_hms(11, 30, 0));
+        assert_eq!(
+            task.clone().end(end_time1).unwrap(),
+            Task {
+                id: None,
+                name: String::from("task a"),
+                working_date: WorkDate::from(String::from("2021-01-02")),
+                start_time: start_time,
+                end_time: Some(end_time1)
+            },
+        );
+
+        let end_time2 = TaskTime(NaiveDate::from_ymd(2021, 1, 2).and_hms(10, 30, 59));
+        assert!(task.end(end_time2).is_err())
+    }
+
+    #[test]
+    fn test_tasktime_duration() {
+        let t1 = TaskTime(NaiveDate::from_ymd(2015, 9, 18).and_hms(23, 56, 0));
+        let t2 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(1, 10, 0));
+
+        let dur1 = &t2 - &t1;
+        assert_eq!(dur1, chrono::Duration::minutes(74));
+        assert_eq!(dur1.to_string_hhmm(), String::from("01:14"));
+
+        let dur2 = &t1 - &t2;
+        assert_eq!(dur2, chrono::Duration::minutes(-74));
+        assert_eq!(dur2.to_string_hhmm(), String::from("-01:14"));
+    }
+
+    #[test]
+    fn test_tasklist_summary() {
+        let s1 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(10, 0, 0));
+        let e1 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(10, 30, 0));
+        let s2 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(10, 30, 0));
+        let e2 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(10, 40, 0));
+        let s3 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(10, 40, 0));
+        let e3 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(10, 55, 0));
+
+        let task1 = Task::start(String::from("task a"), s1).end(e1).unwrap();
+        let task2 = Task::start(String::from("task b"), s2).end(e2).unwrap();
+        let task3 = Task::start(String::from("task a"), s3).end(e3).unwrap();
+
+        let tasklist = TaskList::new(vec![]);
+        assert!(tasklist.summary().is_none());
+
+        let tasklist = TaskList::new(vec![task1, task2, task3]);
+
+        let mut duration_map = HashMap::new();
+        duration_map.insert(String::from("task a"), Duration::minutes(45));
+        duration_map.insert(String::from("task b"), Duration::minutes(10));
+
+        assert_eq!(
+            tasklist.summary(),
+            Some(TaskSummary {
+                start: s1,
+                end: e3,
+                duration_total: e3 - s1,
+                duration_by_taskname: duration_map
+            })
+        );
+    }
+
+    #[test]
+    fn test_workdate_creation_from_tasktime() {
+        assert_eq!(
+            WorkDate::from(TaskTime(NaiveDate::from_ymd(2021, 1, 1).and_hms(5, 0, 0))),
+            WorkDate::from(String::from("2021-01-01"))
+        );
+        assert_eq!(
+            WorkDate::from(TaskTime(NaiveDate::from_ymd(2021, 1, 1).and_hms(23, 59, 0))),
+            WorkDate::from(String::from("2021-01-01"))
+        );
+        assert_eq!(
+            WorkDate::from(TaskTime(NaiveDate::from_ymd(2021, 1, 2).and_hms(0, 0, 0))),
+            WorkDate::from(String::from("2021-01-01"))
+        );
+        assert_eq!(
+            WorkDate::from(TaskTime(NaiveDate::from_ymd(2021, 1, 2).and_hms(4, 59, 0))),
+            WorkDate::from(String::from("2021-01-01"))
+        );
+        assert_eq!(
+            WorkDate::from(TaskTime(NaiveDate::from_ymd(2021, 1, 2).and_hms(5, 0, 0))),
+            WorkDate::from(String::from("2021-01-02"))
+        );
+    }
+
+    #[test]
+    fn test_workdate_to_string() {
+        assert_eq!(
+            WorkDate::from(String::from("2021-01-01")).to_string(),
+            String::from("2021-01-01")
+        );
+    }
+
+    #[test]
+    fn test_tasktime_from_string() {
+        assert_eq!(
+            TaskTime::parse_from_string_iso8601(String::from("2021-01-01T12:34:56")).unwrap(),
+            TaskTime(NaiveDate::from_ymd(2021, 1, 1).and_hms(12, 34, 0))
+        );
+    }
+
+    #[test]
+    fn test_tasktime_from_datetime() {
+        assert_eq!(
+            TaskTime::from(NaiveDate::from_ymd(2021, 1, 1).and_hms(12, 34, 56)),
+            TaskTime(NaiveDate::from_ymd(2021, 1, 1).and_hms(12, 34, 0))
+        );
+    }
+
+    #[test]
+    fn test_tasktime_to_string() {
+        assert_eq!(
+            TaskTime(NaiveDate::from_ymd(2021, 1, 1).and_hms(12, 34, 0)).to_string(),
+            "2021-01-01T12:34:00"
+        );
+    }
+
+    #[test]
+    fn test_tasktime_subtractions() {
+        let t1 = TaskTime(NaiveDate::from_ymd(2021, 1, 1).and_hms(12, 30, 0));
+        let t2 = TaskTime(NaiveDate::from_ymd(2021, 1, 1).and_hms(12, 45, 0));
+        assert_eq!(&t2 - &t1, Duration::minutes(15));
+        assert_eq!(t2 - t1, Duration::minutes(15));
     }
 
     #[test]

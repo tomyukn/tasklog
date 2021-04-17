@@ -480,59 +480,439 @@ pub fn get_db_path_from_env_var_or(default: &str) -> std::io::Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rusqlite::Result;
+    use std::error::Error;
 
-    #[test]
-    fn test_get_db_path_from_env_var() {
-        let db_env_var = "TASKLOG_DB_PATH";
-        let db_file_name = "tasklog_specified.db";
-        let mut env_db_path = env::temp_dir();
-        env_db_path.push(&db_file_name);
-        env::set_var(&db_env_var, env_db_path);
-
-        assert_eq!(
-            get_db_path_from_env_var_or(&db_file_name)
-                .unwrap()
-                .to_str()
-                .unwrap(),
-            env::var(db_env_var).unwrap()
-        );
-    }
-
-    #[test]
-    fn test_get_db_path_from_default() {
-        let db_env_var = "TASKLOG_DB_PATH";
-        let db_file_name = "tasklog_default.db";
-        let mut env_db_path = env::current_dir().unwrap();
-        env_db_path.push(&db_file_name);
-        if let Ok(_) = env::var(db_env_var) {
-            env::remove_var(db_env_var)
-        };
-
-        assert_eq!(
-            get_db_path_from_env_var_or(&db_file_name)
-                .unwrap()
-                .to_str()
-                .unwrap(),
-            env_db_path.to_str().unwrap()
-        );
-    }
-
-    #[test]
-    fn test_is_prepared_false() {
-        let db = Database {
-            conn: Connection::open_in_memory().unwrap(),
-            location: DatabaseLocation::Memory,
-        };
-        assert!(!db.is_prepared().unwrap());
-    }
-
-    #[test]
-    fn test_is_prepared_true() {
+    fn setup_db() -> Result<Database, Box<dyn Error>> {
         let mut db = Database {
-            conn: Connection::open_in_memory().unwrap(),
+            conn: Connection::open_in_memory()?,
             location: DatabaseLocation::Memory,
         };
-        db.initialize().unwrap();
-        assert!(db.is_prepared().unwrap());
+        db.initialize()?;
+        Ok(db)
+    }
+
+    #[test]
+    fn test_database_is_not_prepared() -> Result<(), Box<dyn Error>> {
+        let db = Database {
+            conn: Connection::open_in_memory()?,
+            location: DatabaseLocation::Memory,
+        };
+
+        assert!(!db.is_prepared()?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_database_is_prepared() -> Result<(), Box<dyn Error>> {
+        let mut db = Database {
+            conn: Connection::open_in_memory()?,
+            location: DatabaseLocation::Memory,
+        };
+
+        db.initialize()?;
+        assert!(db.is_prepared()?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_register_new_name() -> Result<(), Box<dyn Error>> {
+        let mut db = setup_db()?;
+
+        db.register_taskname("task b")?;
+        db.register_taskname("task a")?;
+        let mut stmt = db
+            .conn
+            .prepare("SELECT seq_num, task_name FROM tasknames ORDER BY seq_num")?;
+        let mut rows = stmt.query_map(NO_PARAMS, |row| {
+            Ok((row.get::<_, u32>(0)?, row.get::<_, String>(1)?))
+        })?;
+        assert_eq!(rows.next().unwrap()?, (1, String::from("task a")));
+        assert_eq!(rows.next().unwrap()?, (2, String::from("task b")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_register_existing_name() -> Result<(), Box<dyn Error>> {
+        let mut db = setup_db()?;
+
+        db.register_taskname("task a")?;
+        assert!(db.register_taskname("task a").is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_unregister_new_name() -> Result<(), Box<dyn Error>> {
+        let mut db = setup_db()?;
+
+        db.register_taskname("task b")?;
+        db.register_taskname("task a")?;
+        db.unregister_taskname("task a")?;
+        let mut stmt = db
+            .conn
+            .prepare("SELECT seq_num, task_name FROM tasknames ORDER BY seq_num")?;
+        let mut rows = stmt.query_map(NO_PARAMS, |row| {
+            Ok((row.get::<_, u32>(0)?, row.get::<_, String>(1)?))
+        })?;
+        assert_eq!(rows.next().unwrap()?, (1, String::from("task b")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_taskname_by_its_number() -> Result<(), Box<dyn Error>> {
+        let mut db = setup_db()?;
+
+        db.register_taskname("task b")?;
+        db.register_taskname("task a")?;
+        assert_eq!(db.get_taskname(2)?, String::from("task b"));
+        assert!(db.get_taskname(3).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_all_taskname() -> Result<(), Box<dyn Error>> {
+        let mut db = setup_db()?;
+
+        db.register_taskname("task b")?;
+        db.register_taskname("task a")?;
+        let all_names = db.get_tasknames()?;
+        assert_eq!(
+            all_names,
+            vec![(1, String::from("task a")), (2, String::from("task b"))]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn try_get_all_taskname_if_not_exist() -> Result<(), Box<dyn Error>> {
+        let db = setup_db()?;
+
+        let all_names = db.get_tasknames()?;
+        assert_eq!(all_names, vec![]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_task_entry() -> Result<(), Box<dyn Error>> {
+        let mut db = setup_db()?;
+
+        let start_time = chrono::NaiveDate::from_ymd(2021, 1, 1).and_hms(10, 50, 21);
+        let task = Task::new(
+            None,
+            String::from("task a"),
+            TaskTime::from(start_time),
+            None,
+        );
+        db.add_task_entry(&task)?;
+
+        // `tasks` table
+        let id = db.conn.query_row(
+            "SELECT name, working_date, seq_num, start_time, end_time, id FROM tasks",
+            NO_PARAMS,
+            |row| {
+                assert_eq!(row.get::<_, String>(0)?, String::from("task a"));
+                assert_eq!(row.get::<_, String>(1)?, String::from("2021-01-01"));
+                assert_eq!(row.get::<_, u32>(2)?, 1);
+                assert_eq!(
+                    row.get::<_, String>(3)?,
+                    String::from("2021-01-01T10:50:00")
+                );
+                assert_eq!(row.get::<_, String>(4)?, String::from(""));
+
+                let id = row.get::<_, u32>(5)?;
+                Ok(id)
+            },
+        )?;
+
+        // `manager` table
+        db.conn.query_row(
+            "SELECT id, task_id, task_name, start_time FROM manager",
+            NO_PARAMS,
+            |row| {
+                assert_eq!(row.get::<_, u32>(0)?, 0);
+                assert_eq!(row.get::<_, u32>(1)?, id);
+                assert_eq!(row.get::<_, String>(2)?, String::from("task a"));
+                assert_eq!(
+                    row.get::<_, String>(3)?,
+                    String::from("2021-01-01T10:50:00")
+                );
+                Ok(())
+            },
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_current_task_id() -> Result<(), Box<dyn Error>> {
+        let mut db = setup_db()?;
+
+        assert!(db.get_current_task_id()?.is_none());
+
+        let start_time = chrono::NaiveDate::from_ymd(2021, 1, 1).and_hms(10, 50, 21);
+        let task = Task::new(
+            None,
+            String::from("task a"),
+            TaskTime::from(start_time),
+            None,
+        );
+        db.add_task_entry(&task)?;
+        assert_eq!(db.get_current_task_id()?.unwrap(), 1);
+
+        let start_time = chrono::NaiveDate::from_ymd(2021, 1, 1).and_hms(11, 50, 21);
+        let task = Task::new(
+            None,
+            String::from("task b"),
+            TaskTime::from(start_time),
+            None,
+        );
+        db.add_task_entry(&task)?;
+        assert_eq!(db.get_current_task_id()?.unwrap(), 2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_task_id_by_seqnum() -> Result<(), Box<dyn Error>> {
+        let mut db = setup_db()?;
+        {
+            let start_time = chrono::NaiveDate::from_ymd(2021, 1, 1).and_hms(10, 50, 21);
+            let task = Task::new(
+                None,
+                String::from("task a"),
+                TaskTime::from(start_time),
+                None,
+            );
+            db.add_task_entry(&task)?;
+        }
+        {
+            let start_time = chrono::NaiveDate::from_ymd(2021, 1, 1).and_hms(11, 50, 21);
+            let task = Task::new(
+                None,
+                String::from("task b"),
+                TaskTime::from(start_time),
+                None,
+            );
+            db.add_task_entry(&task)?;
+        }
+        {
+            let start_time = chrono::NaiveDate::from_ymd(2021, 1, 2).and_hms(6, 35, 9);
+            let task = Task::new(
+                None,
+                String::from("task c"),
+                TaskTime::from(start_time),
+                None,
+            );
+            db.add_task_entry(&task)?;
+        }
+        {
+            let start_time = chrono::NaiveDate::from_ymd(2021, 1, 2).and_hms(11, 6, 59);
+            let task = Task::new(
+                None,
+                String::from("task d"),
+                TaskTime::from(start_time),
+                None,
+            );
+            db.add_task_entry(&task)?;
+        }
+
+        assert_eq!(
+            db.get_task_id_by_seqnum(2, WorkDate::from(String::from("2021-01-01")))?,
+            2
+        );
+        assert_eq!(
+            db.get_task_id_by_seqnum(1, WorkDate::from(String::from("2021-01-02")))?,
+            3
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_tasks() -> Result<(), Box<dyn Error>> {
+        let mut db = setup_db()?;
+
+        let start_time = chrono::NaiveDate::from_ymd(2021, 1, 1).and_hms(10, 50, 21);
+        let end_time = chrono::NaiveDate::from_ymd(2021, 1, 1).and_hms(11, 50, 9);
+        let task1 = Task::new(
+            Some(1),
+            String::from("task a"),
+            TaskTime::from(start_time),
+            Some(TaskTime::from(end_time)),
+        );
+        db.add_task_entry(&task1)?;
+
+        let start_time = chrono::NaiveDate::from_ymd(2021, 1, 1).and_hms(11, 50, 21);
+        let task2 = Task::new(
+            Some(2),
+            String::from("task b"),
+            TaskTime::from(start_time),
+            None,
+        );
+        db.add_task_entry(&task2)?;
+
+        let start_time = chrono::NaiveDate::from_ymd(2021, 1, 2).and_hms(6, 35, 9);
+        let task3 = Task::new(
+            Some(3),
+            String::from("task c"),
+            TaskTime::from(start_time),
+            None,
+        );
+        db.add_task_entry(&task3)?;
+
+        let start_time = chrono::NaiveDate::from_ymd(2021, 1, 2).and_hms(11, 6, 59);
+        let task4 = Task::new(
+            Some(4),
+            String::from("task d"),
+            TaskTime::from(start_time),
+            None,
+        );
+        db.add_task_entry(&task4)?;
+
+        assert_eq!(
+            db.get_tasks(false, Some(WorkDate::from(String::from("2021-01-01"))))?,
+            vec![(1, task1.clone()), (2, task2.clone())]
+        );
+
+        assert_eq!(
+            db.get_tasks(false, Some(WorkDate::from(String::from("2021-01-02"))))?,
+            vec![(1, task3.clone()), (2, task4.clone())]
+        );
+
+        assert_eq!(
+            db.get_tasks(true, None)?,
+            vec![
+                (1, task1.clone()),
+                (2, task2.clone()),
+                (1, task3.clone()),
+                (2, task4.clone())
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_update_task() -> Result<(), Box<dyn Error>> {
+        let mut db = setup_db()?;
+
+        let start_time1 = chrono::NaiveDate::from_ymd(2021, 1, 1).and_hms(10, 50, 21);
+        let start_time2 = chrono::NaiveDate::from_ymd(2021, 1, 2).and_hms(10, 00, 21);
+        let end_time = chrono::NaiveDate::from_ymd(2021, 1, 2).and_hms(11, 50, 9);
+
+        let task_pre = Task::new(
+            None,
+            String::from("task a"),
+            TaskTime::from(start_time1),
+            None,
+        );
+        db.add_task_entry(&task_pre)?;
+
+        let task_post1 = Task::new(
+            None,
+            String::from("task b"),
+            TaskTime::from(start_time2),
+            Some(TaskTime::from(end_time)),
+        );
+        db.update_task(1, &task_post1)?;
+        db.conn.query_row(
+            "SELECT id, name, working_date, seq_num, start_time, end_time FROM tasks",
+            NO_PARAMS,
+            |row| {
+                assert_eq!(row.get::<_, u32>(0)?, 1);
+                assert_eq!(row.get::<_, String>(1)?, String::from("task b"));
+                assert_eq!(row.get::<_, String>(2)?, String::from("2021-01-02"));
+                assert_eq!(row.get::<_, u32>(3)?, 1);
+                assert_eq!(
+                    row.get::<_, String>(4)?,
+                    String::from("2021-01-02T10:00:00")
+                );
+                assert_eq!(
+                    row.get::<_, String>(5)?,
+                    String::from("2021-01-02T11:50:00")
+                );
+
+                Ok(())
+            },
+        )?;
+
+        let task_post2 = Task::new(
+            None,
+            String::from("task b"),
+            TaskTime::from(start_time2),
+            None,
+        );
+        db.update_task(1, &task_post2)?;
+        db.conn.query_row(
+            "SELECT id, name, working_date, seq_num, start_time, end_time FROM tasks",
+            NO_PARAMS,
+            |row| {
+                assert_eq!(row.get::<_, u32>(0)?, 1);
+                assert_eq!(row.get::<_, String>(1)?, String::from("task b"));
+                assert_eq!(row.get::<_, String>(2)?, String::from("2021-01-02"));
+                assert_eq!(row.get::<_, u32>(3)?, 1);
+                assert_eq!(
+                    row.get::<_, String>(4)?,
+                    String::from("2021-01-02T10:00:00")
+                );
+                assert_eq!(row.get::<_, String>(5)?, String::from(""));
+
+                Ok(())
+            },
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_delete_task() -> Result<(), Box<dyn Error>> {
+        let mut db = setup_db()?;
+        assert!(db.delete_task(1).is_err());
+
+        let start_time = chrono::NaiveDate::from_ymd(2021, 1, 1).and_hms(10, 50, 21);
+        let task1 = Task::new(
+            None,
+            String::from("task a"),
+            TaskTime::from(start_time),
+            None,
+        );
+        db.add_task_entry(&task1)?;
+
+        let task2 = Task::new(
+            None,
+            String::from("task b"),
+            TaskTime::from(start_time),
+            None,
+        );
+        db.add_task_entry(&task2)?;
+        db.delete_task(1)?;
+
+        db.conn.query_row(
+            "SELECT id, name, working_date, seq_num, start_time, end_time FROM tasks",
+            NO_PARAMS,
+            |row| {
+                assert_eq!(row.get::<_, u32>(0)?, 2);
+                assert_eq!(row.get::<_, String>(1)?, String::from("task b"));
+                assert_eq!(row.get::<_, String>(2)?, String::from("2021-01-01"));
+                assert_eq!(row.get::<_, u32>(3)?, 1);
+                assert_eq!(
+                    row.get::<_, String>(4)?,
+                    String::from("2021-01-01T10:50:00")
+                );
+                assert_eq!(row.get::<_, String>(5)?, String::from(""));
+
+                Ok(())
+            },
+        )?;
+
+        Ok(())
     }
 }
