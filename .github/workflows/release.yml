@@ -26,7 +26,7 @@ jobs:
       run: |
         cargo build --release --locked
         cp target/release/${REP_NAME}.exe .
-        7z a -tzip ${REP_NAME}-${VERSION}-x86_64-pc-windows-msvc.zip README.md LICENSE ${REP_NAME}.exe
+        7z a -tzip ${REP_NAME}-${VERSION}-x86_64-pc-windows-msvc.zip README.md LICENSE CHANGELOG.md ${REP_NAME}.exe
       env:
         VERSION: ${{ steps.get_version.outputs.VERSION }}
         REP_NAME: ${{ steps.get_repository_name.outputs.REP_NAME }}
