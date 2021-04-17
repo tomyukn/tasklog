@@ -1,8 +1,8 @@
+use crate::parser::{parse_date, parse_time_hm};
 use anyhow::{anyhow, Result};
 use chrono::prelude::*;
 use chrono::Duration;
 use getset::{Getters, Setters};
-use regex::Regex;
 use std::collections::HashMap;
 use std::fmt;
 use std::ops;
@@ -182,18 +182,18 @@ impl WorkDate {
     pub fn now() -> Self {
         Self::from(TaskTime::now())
     }
+
+    /// Create a `WorkDate` from string.
+    pub fn parse_from_str(s: &str) -> Result<Self> {
+        let (y, m, d) = parse_date(&s)?;
+        let date = NaiveDate::from_ymd_opt(y, m, d).ok_or(anyhow!("invalid date"))?;
+        Ok(WorkDate(date))
+    }
 }
 
 impl fmt::Display for WorkDate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0.format("%Y-%m-%d").to_string())
-    }
-}
-
-impl From<String> for WorkDate {
-    fn from(date: String) -> Self {
-        let d = NaiveDate::parse_from_str(&date, "%Y-%m-%d").expect("invalid date format");
-        WorkDate(d)
     }
 }
 
@@ -227,16 +227,16 @@ impl TaskTime {
     }
 
     /// Create a `TaskTime` from a ISO8601 datetime format.
-    pub fn parse_from_string_iso8601(s: String) -> Result<Self> {
-        match NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S") {
+    pub fn parse_from_str_iso8601(s: &str) -> Result<Self> {
+        match NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S") {
             Ok(t) => Ok(TaskTime(t.with_second(0).unwrap())),
             Err(e) => Err(anyhow!(e)),
         }
     }
 
     /// Create a `TaskTime` from a `"HHMM"` or `"HH:MM"` style string.
-    pub fn from_string_hhmm(hhmm: String) -> Result<Self> {
-        let (hour, min) = parse_hhmm(hhmm)?;
+    pub fn parse_from_str_hhmm(s: &str) -> Result<Self> {
+        let (hour, min) = parse_time_hm(s)?;
         Ok(TaskTime::from_hm(hour, min))
     }
 }
@@ -272,20 +272,6 @@ impl ops::Sub<TaskTime> for TaskTime {
 impl TimeDisplay for TaskTime {
     fn to_string_hhmm(&self) -> String {
         self.0.format("%H:%M").to_string()
-    }
-}
-
-// Parse an `"HHMM"` or `"HH:MM"` style string to a tuple of int values which replesents
-// hours and minutes.
-fn parse_hhmm(hhmm: String) -> Result<(u32, u32)> {
-    let re = Regex::new(r"^([0-2][0-9]|[0-9]):?([0-5][0-9])$").unwrap();
-    let captures = re.captures(&hhmm).ok_or(anyhow!("invalid time format"))?;
-    let h = captures.get(1).unwrap().as_str().parse::<u32>()?;
-    let m = captures.get(2).unwrap().as_str().parse::<u32>()?;
-    if h < 24 && m < 60 {
-        Ok((h, m))
-    } else {
-        Err(anyhow!("invalid time range"))
     }
 }
 
@@ -390,30 +376,34 @@ mod tests {
     fn test_workdate_creation_from_tasktime() {
         assert_eq!(
             WorkDate::from(TaskTime(NaiveDate::from_ymd(2021, 1, 1).and_hms(5, 0, 0))),
-            WorkDate::from(String::from("2021-01-01"))
+            WorkDate::parse_from_str("2021-01-01").unwrap()
         );
         assert_eq!(
             WorkDate::from(TaskTime(NaiveDate::from_ymd(2021, 1, 1).and_hms(23, 59, 0))),
-            WorkDate::from(String::from("2021-01-01"))
+            WorkDate::parse_from_str("2021-01-01").unwrap()
         );
         assert_eq!(
             WorkDate::from(TaskTime(NaiveDate::from_ymd(2021, 1, 2).and_hms(0, 0, 0))),
-            WorkDate::from(String::from("2021-01-01"))
+            WorkDate::parse_from_str("2021-01-01").unwrap()
         );
         assert_eq!(
             WorkDate::from(TaskTime(NaiveDate::from_ymd(2021, 1, 2).and_hms(4, 59, 0))),
-            WorkDate::from(String::from("2021-01-01"))
+            WorkDate::parse_from_str("2021-01-01").unwrap()
         );
         assert_eq!(
             WorkDate::from(TaskTime(NaiveDate::from_ymd(2021, 1, 2).and_hms(5, 0, 0))),
-            WorkDate::from(String::from("2021-01-02"))
+            WorkDate::parse_from_str("2021-01-02").unwrap()
         );
     }
 
     #[test]
     fn test_workdate_to_string() {
         assert_eq!(
-            WorkDate::from(String::from("2021-01-01")).to_string(),
+            WorkDate::parse_from_str("2021-01-01").unwrap().to_string(),
+            String::from("2021-01-01")
+        );
+        assert_eq!(
+            WorkDate::parse_from_str("20210101").unwrap().to_string(),
             String::from("2021-01-01")
         );
     }
@@ -421,7 +411,7 @@ mod tests {
     #[test]
     fn test_tasktime_from_string() {
         assert_eq!(
-            TaskTime::parse_from_string_iso8601(String::from("2021-01-01T12:34:56")).unwrap(),
+            TaskTime::parse_from_str_iso8601("2021-01-01T12:34:56").unwrap(),
             TaskTime(NaiveDate::from_ymd(2021, 1, 1).and_hms(12, 34, 0))
         );
     }
@@ -448,22 +438,5 @@ mod tests {
         let t2 = TaskTime(NaiveDate::from_ymd(2021, 1, 1).and_hms(12, 45, 0));
         assert_eq!(&t2 - &t1, Duration::minutes(15));
         assert_eq!(t2 - t1, Duration::minutes(15));
-    }
-
-    #[test]
-    fn test_parse_hhmm() {
-        assert_eq!(parse_hhmm(String::from("2310")).unwrap(), (23, 10));
-        assert_eq!(parse_hhmm(String::from("0559")).unwrap(), (5, 59));
-        assert_eq!(parse_hhmm(String::from("0605")).unwrap(), (6, 5));
-        assert_eq!(parse_hhmm(String::from("23:10")).unwrap(), (23, 10));
-        assert_eq!(parse_hhmm(String::from("05:59")).unwrap(), (5, 59));
-        assert_eq!(parse_hhmm(String::from("6:05")).unwrap(), (6, 5));
-
-        assert!(parse_hhmm(String::from("aaa")).is_err());
-        assert!(parse_hhmm(String::from("2410")).is_err());
-        assert!(parse_hhmm(String::from("0560")).is_err());
-        assert!(parse_hhmm(String::from("24:10")).is_err());
-        assert!(parse_hhmm(String::from("05:60")).is_err());
-        assert!(parse_hhmm(String::from("5:60")).is_err());
     }
 }

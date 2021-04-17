@@ -192,7 +192,7 @@ fn main() -> Result<()> {
         SubCommand::Start(opts) => {
             // build start time
             let start_time = match opts.time {
-                Some(t) => TaskTime::from_string_hhmm(t)?,
+                Some(t) => TaskTime::parse_from_str_hhmm(&t)?,
                 None => TaskTime::now(),
             };
 
@@ -231,7 +231,7 @@ fn main() -> Result<()> {
         SubCommand::End(opts) => {
             // build end time
             let end_time = match opts.time {
-                Some(t) => TaskTime::from_string_hhmm(t)?,
+                Some(t) => TaskTime::parse_from_str_hhmm(&t)?,
                 None => TaskTime::now(),
             };
 
@@ -258,7 +258,7 @@ fn main() -> Result<()> {
             let db = Database::connect_rw(&db_path)?;
 
             let date = match opts.date {
-                Some(date) => WorkDate::from(date),
+                Some(date) => WorkDate::parse_from_str(&date)?,
                 None => WorkDate::now(),
             };
 
@@ -344,9 +344,9 @@ fn main() -> Result<()> {
             if opts.target == "name" {
                 task.set_name(opts.value);
             } else if opts.target == "start" {
-                task.set_start_time(TaskTime::from_string_hhmm(opts.value)?);
+                task.set_start_time(TaskTime::parse_from_str_hhmm(&opts.value)?);
             } else if opts.target == "end" {
-                task.set_end_time(Some(TaskTime::from_string_hhmm(opts.value)?));
+                task.set_end_time(Some(TaskTime::parse_from_str_hhmm(&opts.value)?));
             }
 
             db.update_task(task.id().unwrap(), &task)?;
