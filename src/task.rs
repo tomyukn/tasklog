@@ -15,10 +15,11 @@ pub trait TimeDisplay {
 
 impl TimeDisplay for Duration {
     fn to_string_hhmm(&self) -> String {
-        let min = self.num_minutes();
-        let quo = min / 60;
-        let rem = min % 60;
-        format!("{:>02}:{:>02}", quo, rem)
+        let minutes = self.num_minutes();
+        let quo = (minutes / 60).abs();
+        let rem = (minutes % 60).abs();
+        let sign = if minutes < 0 { "-" } else { "" };
+        format!("{}{:>02}:{:>02}", sign, quo, rem)
     }
 }
 
