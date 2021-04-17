@@ -1,7 +1,7 @@
 use crate::task::{Task, TaskTime, WorkDate};
 use anyhow::{anyhow, Result};
 use getset::Getters;
-use rusqlite::{params, Connection, OpenFlags, NO_PARAMS};
+use rusqlite::{params, Connection, OpenFlags};
 use std::env;
 use std::fmt;
 use std::path::PathBuf;
@@ -56,7 +56,7 @@ impl Database {
             "SELECT count(name) \
             FROM sqlite_master \
             WHERE type = 'table' and name in ('tasks', 'tasknames', 'manager')",
-            NO_PARAMS,
+            [],
             |row| row.get::<_, u32>(0),
         )?;
 
@@ -67,9 +67,9 @@ impl Database {
     pub fn initialize(&mut self) -> Result<()> {
         let tx = self.conn.transaction()?;
 
-        &tx.execute("DROP TABLE IF EXISTS tasks", NO_PARAMS)?;
-        &tx.execute("DROP TABLE IF EXISTS tasknames", NO_PARAMS)?;
-        &tx.execute("DROP TABLE IF EXISTS manager", NO_PARAMS)?;
+        &tx.execute("DROP TABLE IF EXISTS tasks", [])?;
+        &tx.execute("DROP TABLE IF EXISTS tasknames", [])?;
+        &tx.execute("DROP TABLE IF EXISTS manager", [])?;
 
         &tx.execute(
             "CREATE TABLE tasks (\
@@ -80,7 +80,7 @@ impl Database {
                 start_time TEXT,\
                 end_time TEXT \
             )",
-            NO_PARAMS,
+            [],
         )?;
 
         &tx.execute(
@@ -89,7 +89,7 @@ impl Database {
                 task_name TEXT,\
                 seq_num INTEGER \
             )",
-            NO_PARAMS,
+            [],
         )?;
 
         &tx.execute(
@@ -99,13 +99,13 @@ impl Database {
                 task_name TEXT,\
                 start_time TEXT \
             )",
-            NO_PARAMS,
+            [],
         )?;
 
         &tx.execute(
             "INSERT INTO manager (id) \
             VALUES (0)",
-            NO_PARAMS,
+            [],
         )?;
 
         tx.commit()?;
@@ -144,7 +144,7 @@ impl Database {
                         FROM tasknames \
                     ) AS b \
                     WHERE a.id = b.id",
-                    NO_PARAMS,
+                    [],
                 )?;
 
                 tx.commit()?;
@@ -185,7 +185,7 @@ impl Database {
                         FROM tasknames \
                     ) AS b \
                     WHERE a.id = b.id",
-                    NO_PARAMS,
+                    [],
                 )?;
 
                 tx.commit()?;
@@ -217,7 +217,7 @@ impl Database {
             ORDER BY seq_num",
         )?;
 
-        let rows = stmt.query_map(NO_PARAMS, |row| {
+        let rows = stmt.query_map([], |row| {
             let seq_num = row.get::<_, u32>(0)?;
             let task_name = row.get::<_, String>(1)?;
             Ok((seq_num, task_name))
@@ -252,7 +252,7 @@ impl Database {
         let task_id = tx.query_row(
             "SELECT max(id) \
             FROM tasks",
-            NO_PARAMS,
+            [],
             |row| Ok(row.get_unwrap::<_, u32>(0)),
         )?;
 
@@ -315,7 +315,7 @@ impl Database {
         let id_or_null = self.conn.query_row(
             "SELECT task_id \
             FROM manager",
-            NO_PARAMS,
+            [],
             |row| row.get::<_, Option<u32>>(0),
         )?;
 
@@ -353,7 +353,7 @@ impl Database {
         );
 
         let mut stmt = self.conn.prepare(&sql)?;
-        let rows = stmt.query_map(NO_PARAMS, |row| {
+        let rows = stmt.query_map([], |row| {
             let seq_num = row.get_unwrap::<_, u32>(0);
             let id = row.get_unwrap::<_, u32>(1);
             let name = row.get_unwrap::<_, String>(2);
@@ -441,7 +441,7 @@ impl Database {
                 task_name = NULL, \
                 start_time = NULL \
             WHERE id = 0",
-            NO_PARAMS,
+            [],
         )?;
 
         Ok(())
@@ -526,7 +526,7 @@ mod tests {
         let mut stmt = db
             .conn
             .prepare("SELECT seq_num, task_name FROM tasknames ORDER BY seq_num")?;
-        let mut rows = stmt.query_map(NO_PARAMS, |row| {
+        let mut rows = stmt.query_map([], |row| {
             Ok((row.get::<_, u32>(0)?, row.get::<_, String>(1)?))
         })?;
         assert_eq!(rows.next().unwrap()?, (1, String::from("task a")));
@@ -555,7 +555,7 @@ mod tests {
         let mut stmt = db
             .conn
             .prepare("SELECT seq_num, task_name FROM tasknames ORDER BY seq_num")?;
-        let mut rows = stmt.query_map(NO_PARAMS, |row| {
+        let mut rows = stmt.query_map([], |row| {
             Ok((row.get::<_, u32>(0)?, row.get::<_, String>(1)?))
         })?;
         assert_eq!(rows.next().unwrap()?, (1, String::from("task b")));
@@ -616,7 +616,7 @@ mod tests {
         // `tasks` table
         let id = db.conn.query_row(
             "SELECT name, working_date, seq_num, start_time, end_time, id FROM tasks",
-            NO_PARAMS,
+            [],
             |row| {
                 assert_eq!(row.get::<_, String>(0)?, String::from("task a"));
                 assert_eq!(row.get::<_, String>(1)?, String::from("2021-01-01"));
@@ -635,7 +635,7 @@ mod tests {
         // `manager` table
         db.conn.query_row(
             "SELECT id, task_id, task_name, start_time FROM manager",
-            NO_PARAMS,
+            [],
             |row| {
                 assert_eq!(row.get::<_, u32>(0)?, 0);
                 assert_eq!(row.get::<_, u32>(1)?, id);
@@ -825,7 +825,7 @@ mod tests {
         db.update_task(1, &task_post1)?;
         db.conn.query_row(
             "SELECT id, name, working_date, seq_num, start_time, end_time FROM tasks",
-            NO_PARAMS,
+            [],
             |row| {
                 assert_eq!(row.get::<_, u32>(0)?, 1);
                 assert_eq!(row.get::<_, String>(1)?, String::from("task b"));
@@ -853,7 +853,7 @@ mod tests {
         db.update_task(1, &task_post2)?;
         db.conn.query_row(
             "SELECT id, name, working_date, seq_num, start_time, end_time FROM tasks",
-            NO_PARAMS,
+            [],
             |row| {
                 assert_eq!(row.get::<_, u32>(0)?, 1);
                 assert_eq!(row.get::<_, String>(1)?, String::from("task b"));
@@ -897,7 +897,7 @@ mod tests {
 
         db.conn.query_row(
             "SELECT id, name, working_date, seq_num, start_time, end_time FROM tasks",
-            NO_PARAMS,
+            [],
             |row| {
                 assert_eq!(row.get::<_, u32>(0)?, 2);
                 assert_eq!(row.get::<_, String>(1)?, String::from("task b"));
