@@ -1,6 +1,6 @@
 [package]
 name = "tasklog"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["tomyukn <5608467+tomyukn@users.noreply.github.com>"]
 edition = "2018"
 
