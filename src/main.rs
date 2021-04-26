@@ -276,7 +276,7 @@ fn main() -> Result<()> {
 
             for (n, task) in tasks_with_num {
                 println!(
-                    "{:<10}  {:<2}  {:<5} - {:<5}  {:<8}  {:<20}",
+                    "{:<10}  {:>2}  {:<5} - {:<5}  {:<8}  {:<20}",
                     task.working_date().to_string(),
                     n,
                     task.start_time().to_string_hhmm(),
