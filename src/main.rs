@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::{crate_version, Clap};
+use dialoguer::Confirm;
 use tasklog::db::{get_db_path_from_env_var_or, Database};
 use tasklog::task::{Task, TaskList, TaskTime, TimeDisplay, WorkDate};
 
@@ -71,6 +72,18 @@ enum SubCommand {
         version = crate_version!()
     )]
     Delete(DeleteOpts),
+
+    #[clap(
+        about = "Shows the internal status for debugging",
+        version = crate_version!()
+    )]
+    ShowManager,
+
+    #[clap(
+        about = "Resets the internal status for debugging",
+        version = crate_version!()
+    )]
+    ResetManager,
 }
 
 #[derive(Clap)]
@@ -359,6 +372,33 @@ fn main() -> Result<()> {
             let task_id = db.get_task_id_by_seqnum(opts.task_number, working_date)?;
             db.delete_task(task_id)?;
             println!("task {} deleted", opts.task_number);
+        }
+
+        SubCommand::ShowManager => {
+            println!(
+                "Caution: This command shows the internal status for debugging the application.\n"
+            );
+            let db = Database::connect_r(&db_path)?;
+            let manager = db.get_manager()?;
+            println!("{:?}", manager);
+        }
+
+        SubCommand::ResetManager => {
+            println!("Caution: This operation can be dangerous. It may break your database.\n");
+
+            let proceed = Confirm::new()
+                .with_prompt("Do you wish to continue?")
+                .wait_for_newline(false)
+                .default(false)
+                .show_default(true)
+                .interact()?;
+            if proceed {
+                let db = Database::connect_rw(&db_path)?;
+                db.reset_manager()?;
+                println!("Manager has been reset.");
+            } else {
+                println!("Oparation canceled.");
+            };
         }
     }
 
