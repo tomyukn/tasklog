@@ -71,6 +71,12 @@ enum SubCommand {
         version = crate_version!()
     )]
     Delete(DeleteOpts),
+
+    #[clap(
+        about = "Shows the internal status for debugging",
+        version = crate_version!()
+    )]
+    ShowManager,
 }
 
 #[derive(Clap)]
@@ -359,6 +365,15 @@ fn main() -> Result<()> {
             let task_id = db.get_task_id_by_seqnum(opts.task_number, working_date)?;
             db.delete_task(task_id)?;
             println!("task {} deleted", opts.task_number);
+        }
+
+        SubCommand::ShowManager => {
+            println!(
+                "Caution: This command shows the internal status for debugging the application.\n"
+            );
+            let db = Database::connect_r(&db_path)?;
+            let manager = db.get_manager()?;
+            println!("{:?}", manager);
         }
     }
 

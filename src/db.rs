@@ -446,6 +446,30 @@ impl Database {
 
         Ok(())
     }
+
+    /// Get manager entry
+    pub fn get_manager(&self) -> Result<Manager> {
+        let manager = self.conn.query_row(
+            "SELECT task_id, task_name, start_time \
+            FROM manager",
+            [],
+            |row| {
+                let task_id = row.get::<_, Option<u32>>(0)?;
+                let task_name = row.get::<_, Option<String>>(1)?;
+                let start_time_raw = row.get::<_, Option<String>>(2)?;
+                Ok(Manager {
+                    task_id,
+                    task_name,
+                    start_time: if start_time_raw.is_none() {
+                        None
+                    } else {
+                        Some(TaskTime::parse_from_str_iso8601(&start_time_raw.unwrap()).unwrap())
+                    },
+                })
+            },
+        )?;
+        Ok(manager)
+    }
 }
 
 /// Represents database location, file or memory.
@@ -462,6 +486,13 @@ impl fmt::Display for DatabaseLocation {
         };
         write!(f, "{}", s)
     }
+}
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct Manager {
+    task_id: Option<u32>,
+    task_name: Option<String>,
+    start_time: Option<TaskTime>,
 }
 
 /// Get the database path from the environment variable `TASKLOG_DB_PATH`,
