@@ -447,6 +447,7 @@ dependencies = [
  "getset",
  "regex",
  "rusqlite",
+ "termcolor",
 ]
 
 [[package]]
