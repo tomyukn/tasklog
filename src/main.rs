@@ -375,7 +375,7 @@ fn main() -> Result<()> {
         }
 
         SubCommand::ShowManager => {
-            println!(
+            eprintln!(
                 "Caution: This command shows the internal status for debugging the application.\n"
             );
             let db = Database::connect_r(&db_path)?;
@@ -384,7 +384,7 @@ fn main() -> Result<()> {
         }
 
         SubCommand::ResetManager => {
-            println!("Caution: This operation can be dangerous. It may break your database.\n");
+            eprintln!("Caution: This operation can be dangerous. It may break your database.\n");
 
             let proceed = Confirm::new()
                 .with_prompt("Do you wish to continue?")
