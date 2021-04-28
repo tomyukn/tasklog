@@ -1,8 +1,10 @@
 use anyhow::Result;
 use clap::{crate_version, Clap};
 use dialoguer::Confirm;
+use std::io::Write;
 use tasklog::db::{get_db_path_from_env_var_or, Database};
 use tasklog::task::{Task, TaskList, TaskTime, TimeDisplay, WorkDate};
+use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 // command line arguments
 #[derive(Clap)]
@@ -166,6 +168,13 @@ fn initialize_database(db: &mut Database, force: bool) -> Result<()> {
     Ok(())
 }
 
+fn write_bold(out: &mut StandardStream, s: &str) -> std::io::Result<()> {
+    out.set_color(ColorSpec::new().set_bold(true))?;
+    write!(out, "{}", s)?;
+    out.reset()?;
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let root_opts = Opts::parse();
     let db_path = get_db_path_from_env_var_or("tasklog.db")?;
@@ -274,21 +283,25 @@ fn main() -> Result<()> {
                 Some(date) => WorkDate::parse_from_str(&date)?,
                 None => WorkDate::now(),
             };
+            let tasks_with_num = db.get_tasks(opts.all, Some(date))?;
 
             // show details
-            let tasks_with_num = db.get_tasks(opts.all, Some(date))?;
-            println!("List");
-            println!("----");
-            println!(
+            let mut stdout = StandardStream::stdout(ColorChoice::Auto);
+            stdout.lock();
+
+            write_bold(&mut stdout, "List\n")?;
+            writeln!(
+                &mut stdout,
                 "{:<10}  {:<2}  {:<5} - {:<5}  {:<8}  {:<20}",
                 "Date", "No", "Start", "End", "Duration", "Task"
-            );
+            )?;
 
             let mut tasks: Vec<Task> = Vec::new();
             let mut breaks: Vec<Task> = Vec::new();
 
             for (n, task) in tasks_with_num {
-                println!(
+                writeln!(
+                    &mut stdout,
                     "{:<10}  {:>2}  {:<5} - {:<5}  {:<8}  {:<20}",
                     task.working_date().to_string(),
                     n,
@@ -299,7 +312,7 @@ fn main() -> Result<()> {
                     },
                     task.duration_hhmm(),
                     task.name(),
-                );
+                )?;
 
                 if task.name() == break_time_taskname {
                     breaks.push(task);
@@ -307,20 +320,30 @@ fn main() -> Result<()> {
                     tasks.push(task);
                 };
             }
+            writeln!(&mut stdout, "")?;
 
             // show summary
             if !opts.all {
                 if let Some(summary) = TaskList::new(tasks).summary() {
-                    println!("\nSummary");
-                    println!("-------");
-                    println!("   Start: {}", summary.start().to_string_hhmm());
-                    println!("     End: {}", summary.end().to_string_hhmm());
-                    println!("Duration: {}\n", summary.duration_total().to_string_hhmm());
+                    write_bold(&mut stdout, "Start    : ")?;
+                    writeln!(&mut stdout, "{}", summary.start().to_string_hhmm())?;
+
+                    write_bold(&mut stdout, "End      : ")?;
+                    writeln!(&mut stdout, "{}", summary.end().to_string_hhmm())?;
+
+                    write_bold(&mut stdout, "Duration : ")?;
+                    writeln!(
+                        &mut stdout,
+                        "{}\n",
+                        summary.duration_total().to_string_hhmm()
+                    )?;
 
                     // total time
                     let mut names: Vec<String> =
                         summary.duration_by_taskname().keys().cloned().collect();
                     names.sort();
+
+                    write_bold(&mut stdout, "Task duration\n")?;
                     for name in names {
                         let dur = summary
                             .duration_by_taskname()
@@ -331,16 +354,17 @@ fn main() -> Result<()> {
                     }
 
                     // break time
-                    println!("\n[Break]");
+                    write_bold(&mut stdout, "\nBreak\n")?;
                     for break_time in breaks {
-                        println!(
+                        writeln!(
+                            &mut stdout,
                             "{} - {}",
                             break_time.start_time().to_string_hhmm(),
                             match break_time.end_time() {
                                 Some(t) => t.to_string_hhmm(),
                                 None => String::from(""),
                             }
-                        );
+                        )?;
                     }
                     println!("")
                 }
@@ -375,16 +399,27 @@ fn main() -> Result<()> {
         }
 
         SubCommand::ShowManager => {
-            println!(
-                "Caution: This command shows the internal status for debugging the application.\n"
-            );
+            let mut stderr = StandardStream::stderr(ColorChoice::Auto);
+            stderr.lock();
+
+            write_bold(
+                &mut stderr,
+                "Caution: This command shows the internal status for debugging the application.\n\n",
+            )?;
+
             let db = Database::connect_r(&db_path)?;
             let manager = db.get_manager()?;
             println!("{:?}", manager);
         }
 
         SubCommand::ResetManager => {
-            println!("Caution: This operation can be dangerous. It may break your database.\n");
+            let mut stderr = StandardStream::stderr(ColorChoice::Auto);
+            stderr.lock();
+
+            write_bold(
+                &mut stderr,
+                "Caution: This operation can be dangerous. It may break your database.\n\n",
+            )?;
 
             let proceed = Confirm::new()
                 .with_prompt("Do you wish to continue?")
