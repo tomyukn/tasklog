@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `show-manager` subcommand.
 - Add `reset-manager` subcommand.
 
+### Changes
+
+- Color outputs.
+
 ### Fixed
 
 - Align `No` column of the task list.
