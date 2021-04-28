@@ -3,7 +3,7 @@ use clap::{crate_version, Clap};
 use dialoguer::Confirm;
 use std::io::Write;
 use tasklog::db::{get_db_path_from_env_var_or, Database};
-use tasklog::subcommand::init;
+use tasklog::subcommand::{init, register};
 use tasklog::task::{Task, TaskList, TaskTime, TimeDisplay, WorkDate};
 use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -172,11 +172,7 @@ fn main() -> Result<()> {
         }
 
         SubCommand::Register(opts) => {
-            let mut db = Database::connect_rw(&db_path)?;
-
-            if let Err(e) = db.register_taskname(&opts.task_name) {
-                println!("{}: {}", e, &opts.task_name);
-            }
+            register::run(db_path, &opts.task_name)?;
         }
 
         SubCommand::Unregister(opts) => {
