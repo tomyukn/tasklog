@@ -404,7 +404,7 @@ fn main() -> Result<()> {
 
             write_bold(
                 &mut stderr,
-                "Caution: This command shows the internal status for debugging the application.\n\n",
+                "Warning: This command shows the internal status for debugging the application.\n\n",
             )?;
 
             let db = Database::connect_r(&db_path)?;
@@ -418,7 +418,7 @@ fn main() -> Result<()> {
 
             write_bold(
                 &mut stderr,
-                "Caution: This operation can be dangerous. It may break your database.\n\n",
+                "Warning: This operation can be dangerous. It may break your database.\n",
             )?;
 
             let proceed = Confirm::new()
@@ -430,9 +430,9 @@ fn main() -> Result<()> {
             if proceed {
                 let db = Database::connect_rw(&db_path)?;
                 db.reset_manager()?;
-                println!("Manager has been reset.");
+                println!("\nManager has been reset.");
             } else {
-                println!("Oparation canceled.");
+                println!("\nOparation canceled.");
             };
         }
     }
