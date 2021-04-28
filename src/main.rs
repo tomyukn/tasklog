@@ -3,6 +3,7 @@ use clap::{crate_version, Clap};
 use dialoguer::Confirm;
 use std::io::Write;
 use tasklog::db::{get_db_path_from_env_var_or, Database};
+use tasklog::subcommand::init;
 use tasklog::task::{Task, TaskList, TaskTime, TimeDisplay, WorkDate};
 use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -153,21 +154,6 @@ struct DeleteOpts {
     task_number: u32,
 }
 
-fn initialize_database(db: &mut Database, force: bool) -> Result<()> {
-    if !db.is_prepared()? || force {
-        db.initialize()?;
-        println!("Database created: {}", db.location());
-    } else {
-        println!(
-            "Database already exists: {}\n\
-            Use --force to recreate",
-            db.location()
-        );
-    };
-
-    Ok(())
-}
-
 fn write_bold(out: &mut StandardStream, s: &str) -> std::io::Result<()> {
     out.set_color(ColorSpec::new().set_bold(true))?;
     write!(out, "{}", s)?;
@@ -182,8 +168,7 @@ fn main() -> Result<()> {
 
     match root_opts.subcmd {
         SubCommand::Init(opts) => {
-            let mut db = Database::connect_rwc(&db_path)?;
-            initialize_database(&mut db, opts.force)?;
+            init::run(db_path, opts.force)?;
         }
 
         SubCommand::Register(opts) => {
