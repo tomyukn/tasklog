@@ -79,6 +79,9 @@ Break
 11:50 - 13:00
 
 $tasklog delete 4
+"task one" started at 2021-04-10 13:00
+Really delete? yes
+
 task 4 deleted
 
 $ tasklog list
