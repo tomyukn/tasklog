@@ -3,7 +3,7 @@ use clap::{crate_version, Clap};
 use dialoguer::Confirm;
 use std::io::Write;
 use tasklog::db::{get_db_path_from_env_var_or, Database};
-use tasklog::subcommand::{init, register, unregister};
+use tasklog::subcommand::{init, register, show_tasks, unregister};
 use tasklog::task::{Task, TaskList, TaskTime, TimeDisplay, WorkDate};
 use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -180,12 +180,7 @@ fn main() -> Result<()> {
         }
 
         SubCommand::Tasks => {
-            let db = Database::connect_r(&db_path)?;
-
-            let tasks = db.get_tasknames()?;
-            for (num, taskname) in tasks {
-                println!("{0:>2}. {1}", num, taskname);
-            }
+            show_tasks::run(db_path)?;
         }
 
         SubCommand::Start(opts) => {
