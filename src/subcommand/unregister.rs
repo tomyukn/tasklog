@@ -7,7 +7,7 @@ pub fn run(db_path: PathBuf, task_name: &str) -> Result<()> {
     let mut db = Database::connect_rw(&db_path)?;
 
     if let Err(e) = db.unregister_taskname(task_name) {
-        println!("{}: {}", e, task_name);
+        eprintln!("{}: {}", e, task_name);
     }
 
     Ok(())
