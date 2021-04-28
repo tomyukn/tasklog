@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::{crate_version, Clap};
 use dialoguer::Confirm;
 use std::io::Write;
@@ -236,10 +236,14 @@ fn main() -> Result<()> {
 
             // create a new task
             let new_task_name = if opts.break_time {
-                String::from(break_time_taskname)
+                Ok(String::from(break_time_taskname))
             } else {
-                db.get_taskname(opts.task_number.unwrap())?
-            };
+                match opts.task_number {
+                    Some(id) => db.get_taskname(id),
+                    None => Err(anyhow!("Task number was not provided")),
+                }
+            }?;
+
             let new_task = Task::start(new_task_name.clone(), start_time);
             db.add_task_entry(&new_task)?;
 

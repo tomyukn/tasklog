@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Align `No` column of the task list.
+- Prevent `start` subcommand from panicing when no task number is provided.
 
 ## [0.2.0] - 2021-04-18
 
