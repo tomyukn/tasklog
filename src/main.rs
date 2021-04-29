@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::{crate_version, Clap};
 use dialoguer::Confirm;
 use std::io::Write;
 use tasklog::db::{get_db_path_from_env_var_or, Database};
-use tasklog::subcommand::{init, register, show_tasks, unregister};
+use tasklog::subcommand::{init, register, show_tasks, start, unregister};
 use tasklog::task::{Task, TaskList, TaskTime, TimeDisplay, WorkDate};
 use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -184,46 +184,13 @@ fn main() -> Result<()> {
         }
 
         SubCommand::Start(opts) => {
-            // build start time
-            let start_time = match opts.time {
-                Some(t) => TaskTime::parse_from_str_hhmm(&t)?,
-                None => TaskTime::now(),
-            };
-
-            let mut db = Database::connect_rw(&db_path)?;
-
-            // fill end time of the previous task if it is empty
-            if let Some(current_task_id) = db.get_current_task_id()? {
-                let mut current_task = db.get_task(current_task_id)?;
-
-                let updated_task = current_task.set_end_time(Some(start_time));
-                db.update_task(current_task_id, &updated_task)?;
-
-                println!(
-                    "{} ended at {}",
-                    &updated_task.name(),
-                    &start_time.to_string_hhmm()
-                );
-            }
-
-            // create a new task
-            let new_task_name = if opts.break_time {
-                Ok(String::from(break_time_taskname))
-            } else {
-                match opts.task_number {
-                    Some(id) => db.get_taskname(id),
-                    None => Err(anyhow!("Task number was not provided")),
-                }
-            }?;
-
-            let new_task = Task::start(new_task_name.clone(), start_time);
-            db.add_task_entry(&new_task)?;
-
-            println!(
-                "{} started at {}",
-                new_task_name,
-                start_time.to_string_hhmm()
-            );
+            start::run(
+                db_path,
+                opts.task_number,
+                opts.break_time,
+                opts.time,
+                break_time_taskname,
+            )?;
         }
 
         SubCommand::End(opts) => {
