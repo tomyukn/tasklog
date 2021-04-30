@@ -3,7 +3,7 @@ use clap::{crate_version, Clap};
 use dialoguer::Confirm;
 use std::io::Write;
 use tasklog::db::{get_db_path_from_env_var_or, Database};
-use tasklog::subcommand::{init, register, show_tasks, start, unregister};
+use tasklog::subcommand::{end, init, register, show_tasks, start, unregister};
 use tasklog::task::{Task, TaskList, TaskTime, TimeDisplay, WorkDate};
 use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -194,29 +194,7 @@ fn main() -> Result<()> {
         }
 
         SubCommand::End(opts) => {
-            // build end time
-            let end_time = match opts.time {
-                Some(t) => TaskTime::parse_from_str_hhmm(&t)?,
-                None => TaskTime::now(),
-            };
-
-            let db = Database::connect_rw(&db_path)?;
-
-            // fill end time of the current task
-            if let Some(current_task_id) = db.get_current_task_id()? {
-                let mut current_task = db.get_task(current_task_id)?;
-
-                let updated_task = current_task.set_end_time(Some(end_time));
-                db.update_task(current_task_id, &updated_task)?;
-
-                db.reset_manager()?;
-
-                println!(
-                    "{} ended at {}",
-                    &current_task.name(),
-                    &end_time.to_string_hhmm()
-                );
-            }
+            end::run(db_path, opts.time)?;
         }
 
         SubCommand::List(opts) => {
