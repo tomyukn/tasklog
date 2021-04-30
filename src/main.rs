@@ -4,7 +4,7 @@ use dialoguer::Confirm;
 use std::io::Write;
 use tasklog::db::{get_db_path_from_env_var_or, Database};
 use tasklog::subcommand;
-use tasklog::task::{Task, TaskList, TaskTime, TimeDisplay, WorkDate};
+use tasklog::task::{TaskTime, TimeDisplay, WorkDate};
 use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 // command line arguments
@@ -198,98 +198,7 @@ fn main() -> Result<()> {
         }
 
         SubCommand::List(opts) => {
-            let db = Database::connect_rw(&db_path)?;
-
-            let date = match opts.date {
-                Some(date) => WorkDate::parse_from_str(&date)?,
-                None => WorkDate::now(),
-            };
-            let tasks_with_num = db.get_tasks(opts.all, Some(date))?;
-
-            // show details
-            let mut stdout = StandardStream::stdout(ColorChoice::Auto);
-            stdout.lock();
-
-            write_bold(&mut stdout, "List\n")?;
-            writeln!(
-                &mut stdout,
-                "{:<10}  {:<2}  {:<5} - {:<5}  {:<8}  {:<20}",
-                "Date", "No", "Start", "End", "Duration", "Task"
-            )?;
-
-            let mut tasks: Vec<Task> = Vec::new();
-            let mut breaks: Vec<Task> = Vec::new();
-
-            for (n, task) in tasks_with_num {
-                writeln!(
-                    &mut stdout,
-                    "{:<10}  {:>2}  {:<5} - {:<5}  {:<8}  {:<20}",
-                    task.working_date().to_string(),
-                    n,
-                    task.start_time().to_string_hhmm(),
-                    match task.end_time() {
-                        Some(t) => t.to_string_hhmm(),
-                        None => String::from(""),
-                    },
-                    task.duration_hhmm(),
-                    task.name(),
-                )?;
-
-                if task.name() == break_time_taskname {
-                    breaks.push(task);
-                } else {
-                    tasks.push(task);
-                };
-            }
-            writeln!(&mut stdout, "")?;
-
-            // show summary
-            if !opts.all {
-                if let Some(summary) = TaskList::new(tasks).summary() {
-                    write_bold(&mut stdout, "Start    : ")?;
-                    writeln!(&mut stdout, "{}", summary.start().to_string_hhmm())?;
-
-                    write_bold(&mut stdout, "End      : ")?;
-                    writeln!(&mut stdout, "{}", summary.end().to_string_hhmm())?;
-
-                    write_bold(&mut stdout, "Duration : ")?;
-                    writeln!(
-                        &mut stdout,
-                        "{}\n",
-                        summary.duration_total().to_string_hhmm()
-                    )?;
-
-                    // total time
-                    let mut names: Vec<String> =
-                        summary.duration_by_taskname().keys().cloned().collect();
-                    names.sort();
-
-                    write_bold(&mut stdout, "Task duration\n")?;
-                    for name in names {
-                        let dur = summary
-                            .duration_by_taskname()
-                            .get(&name)
-                            .unwrap()
-                            .to_string_hhmm();
-                        println!("{:<5}  {}", dur, name);
-                    }
-
-                    // break time
-                    write_bold(&mut stdout, "\nBreak\n")?;
-                    for break_time in breaks {
-                        writeln!(
-                            &mut stdout,
-                            "{} - {}",
-                            break_time.start_time().to_string_hhmm(),
-                            match break_time.end_time() {
-                                Some(t) => t.to_string_hhmm(),
-                                None => String::from(""),
-                            }
-                        )?;
-                    }
-                    println!("")
-                }
-            }
+            subcommand::list_log::run(db_path, opts.all, opts.date, break_time_taskname)?;
         }
 
         SubCommand::Update(opts) => {
