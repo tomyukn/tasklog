@@ -3,7 +3,7 @@ use clap::{crate_version, Clap};
 use dialoguer::Confirm;
 use std::io::Write;
 use tasklog::db::{get_db_path_from_env_var_or, Database};
-use tasklog::subcommand::{end, init, register, show_tasks, start, unregister};
+use tasklog::subcommand;
 use tasklog::task::{Task, TaskList, TaskTime, TimeDisplay, WorkDate};
 use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -168,23 +168,23 @@ fn main() -> Result<()> {
 
     match root_opts.subcmd {
         SubCommand::Init(opts) => {
-            init::run(db_path, opts.force)?;
+            subcommand::init::run(db_path, opts.force)?;
         }
 
         SubCommand::Register(opts) => {
-            register::run(db_path, &opts.task_name)?;
+            subcommand::register::run(db_path, &opts.task_name)?;
         }
 
         SubCommand::Unregister(opts) => {
-            unregister::run(db_path, &opts.task_name)?;
+            subcommand::unregister::run(db_path, &opts.task_name)?;
         }
 
         SubCommand::Tasks => {
-            show_tasks::run(db_path)?;
+            subcommand::show_tasks::run(db_path)?;
         }
 
         SubCommand::Start(opts) => {
-            start::run(
+            subcommand::start::run(
                 db_path,
                 opts.task_number,
                 opts.break_time,
@@ -194,7 +194,7 @@ fn main() -> Result<()> {
         }
 
         SubCommand::End(opts) => {
-            end::run(db_path, opts.time)?;
+            subcommand::end::run(db_path, opts.time)?;
         }
 
         SubCommand::List(opts) => {
