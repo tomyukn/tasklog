@@ -4,7 +4,7 @@ use dialoguer::Confirm;
 use std::io::Write;
 use tasklog::db::{get_db_path_from_env_var_or, Database};
 use tasklog::subcommand;
-use tasklog::task::{TaskTime, TimeDisplay, WorkDate};
+use tasklog::task::{TimeDisplay, WorkDate};
 use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 // command line arguments
@@ -202,21 +202,7 @@ fn main() -> Result<()> {
         }
 
         SubCommand::Update(opts) => {
-            let db = Database::connect_rw(&db_path)?;
-            let working_date = WorkDate::now();
-
-            let task_id = db.get_task_id_by_seqnum(opts.task_number, working_date)?;
-            let mut task = db.get_task(task_id)?;
-
-            if opts.target == "name" {
-                task.set_name(opts.value);
-            } else if opts.target == "start" {
-                task.set_start_time(TaskTime::parse_from_str_hhmm(&opts.value)?);
-            } else if opts.target == "end" {
-                task.set_end_time(Some(TaskTime::parse_from_str_hhmm(&opts.value)?));
-            }
-
-            db.update_task(task.id().unwrap(), &task)?;
+            subcommand::update::run(db_path, opts.task_number, opts.target, opts.value)?;
         }
 
         SubCommand::Delete(opts) => {
