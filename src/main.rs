@@ -4,7 +4,6 @@ use dialoguer::Confirm;
 use std::io::Write;
 use tasklog::db::{get_db_path_from_env_var_or, Database};
 use tasklog::subcommand;
-use tasklog::task::{TimeDisplay, WorkDate};
 use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 // command line arguments
@@ -207,30 +206,7 @@ fn main() -> Result<()> {
 
         SubCommand::Delete(opts) => {
             let mut db = Database::connect_rw(&db_path)?;
-            let working_date = WorkDate::now();
-
-            let task_id = db.get_task_id_by_seqnum(opts.task_number, working_date)?;
-            let task = db.get_task(task_id)?;
-
-            eprintln!(
-                "\"{}\" started at {} {}",
-                task.name(),
-                task.working_date().to_string(),
-                task.start_time().to_string_hhmm()
-            );
-
-            let proceed = Confirm::new()
-                .with_prompt("Really delete?")
-                .wait_for_newline(false)
-                .default(false)
-                .show_default(true)
-                .interact()?;
-            if proceed {
-                db.delete_task(task_id)?;
-                println!("\ntask {} deleted", opts.task_number);
-            } else {
-                println!("\nOparation canceled.");
-            };
+            subcommand::delete::run(&mut db, opts.task_number)?;
         }
 
         SubCommand::ShowManager => {

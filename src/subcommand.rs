@@ -1,3 +1,4 @@
+pub mod delete;
 pub mod end;
 pub mod init;
 pub mod list_log;
