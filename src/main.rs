@@ -1,10 +1,7 @@
 use anyhow::Result;
 use clap::{crate_version, Clap};
-use dialoguer::Confirm;
-use std::io::Write;
 use tasklog::db::{get_db_path_from_env_var_or, Database};
 use tasklog::subcommand;
-use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 // command line arguments
 #[derive(Clap)]
@@ -153,13 +150,6 @@ struct DeleteOpts {
     task_number: u32,
 }
 
-fn write_bold(out: &mut StandardStream, s: &str) -> std::io::Result<()> {
-    out.set_color(ColorSpec::new().set_bold(true))?;
-    write!(out, "{}", s)?;
-    out.reset()?;
-    Ok(())
-}
-
 fn main() -> Result<()> {
     let root_opts = Opts::parse();
     let db_path = get_db_path_from_env_var_or("tasklog.db")?;
@@ -210,41 +200,13 @@ fn main() -> Result<()> {
         }
 
         SubCommand::ShowManager => {
-            let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-            stderr.lock();
-
-            write_bold(
-                &mut stderr,
-                "Warning: This command shows the internal status for debugging the application.\n\n",
-            )?;
-
             let db = Database::connect_r(&db_path)?;
-            let manager = db.get_manager()?;
-            println!("{:?}", manager);
+            subcommand::manager::show(db)?;
         }
 
         SubCommand::ResetManager => {
-            let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-            stderr.lock();
-
-            write_bold(
-                &mut stderr,
-                "Warning: This operation can be dangerous. It may break your database.\n",
-            )?;
-
-            let proceed = Confirm::new()
-                .with_prompt("Do you wish to continue?")
-                .wait_for_newline(false)
-                .default(false)
-                .show_default(true)
-                .interact()?;
-            if proceed {
-                let db = Database::connect_rw(&db_path)?;
-                db.reset_manager()?;
-                println!("\nManager has been reset.");
-            } else {
-                println!("\nOparation canceled.");
-            };
+            let db = Database::connect_rw(&db_path)?;
+            subcommand::manager::reset(db)?;
         }
     }
 
