@@ -1,10 +1,7 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use clap::{crate_version, Clap};
-use dialoguer::Confirm;
-use std::io::Write;
 use tasklog::db::{get_db_path_from_env_var_or, Database};
-use tasklog::task::{Task, TaskList, TaskTime, TimeDisplay, WorkDate};
-use termcolor::{ColorChoice, ColorSpec, StandardStream, WriteColor};
+use tasklog::subcommand;
 
 // command line arguments
 #[derive(Clap)]
@@ -153,28 +150,6 @@ struct DeleteOpts {
     task_number: u32,
 }
 
-fn initialize_database(db: &mut Database, force: bool) -> Result<()> {
-    if !db.is_prepared()? || force {
-        db.initialize()?;
-        println!("Database created: {}", db.location());
-    } else {
-        println!(
-            "Database already exists: {}\n\
-            Use --force to recreate",
-            db.location()
-        );
-    };
-
-    Ok(())
-}
-
-fn write_bold(out: &mut StandardStream, s: &str) -> std::io::Result<()> {
-    out.set_color(ColorSpec::new().set_bold(true))?;
-    write!(out, "{}", s)?;
-    out.reset()?;
-    Ok(())
-}
-
 fn main() -> Result<()> {
     let root_opts = Opts::parse();
     let db_path = get_db_path_from_env_var_or("tasklog.db")?;
@@ -183,280 +158,63 @@ fn main() -> Result<()> {
     match root_opts.subcmd {
         SubCommand::Init(opts) => {
             let mut db = Database::connect_rwc(&db_path)?;
-            initialize_database(&mut db, opts.force)?;
+            subcommand::init::run(&mut db, opts.force)?;
         }
 
         SubCommand::Register(opts) => {
             let mut db = Database::connect_rw(&db_path)?;
-
-            if let Err(e) = db.register_taskname(&opts.task_name) {
-                println!("{}: {}", e, &opts.task_name);
-            }
+            subcommand::register::run(&mut db, &opts.task_name)?;
         }
 
         SubCommand::Unregister(opts) => {
             let mut db = Database::connect_rw(&db_path)?;
-
-            if let Err(e) = db.unregister_taskname(&opts.task_name) {
-                println!("{}: {}", e, &opts.task_name);
-            }
+            subcommand::unregister::run(&mut db, &opts.task_name)?;
         }
 
         SubCommand::Tasks => {
             let db = Database::connect_r(&db_path)?;
-
-            let tasks = db.get_tasknames()?;
-            for (num, taskname) in tasks {
-                println!("{0:>2}. {1}", num, taskname);
-            }
+            subcommand::show_tasks::run(&db)?;
         }
 
         SubCommand::Start(opts) => {
-            // build start time
-            let start_time = match opts.time {
-                Some(t) => TaskTime::parse_from_str_hhmm(&t)?,
-                None => TaskTime::now(),
-            };
-
             let mut db = Database::connect_rw(&db_path)?;
-
-            // fill end time of the previous task if it is empty
-            if let Some(current_task_id) = db.get_current_task_id()? {
-                let mut current_task = db.get_task(current_task_id)?;
-
-                let updated_task = current_task.set_end_time(Some(start_time));
-                db.update_task(current_task_id, &updated_task)?;
-
-                println!(
-                    "{} ended at {}",
-                    &updated_task.name(),
-                    &start_time.to_string_hhmm()
-                );
-            }
-
-            // create a new task
-            let new_task_name = if opts.break_time {
-                Ok(String::from(break_time_taskname))
-            } else {
-                match opts.task_number {
-                    Some(id) => db.get_taskname(id),
-                    None => Err(anyhow!("Task number was not provided")),
-                }
-            }?;
-
-            let new_task = Task::start(new_task_name.clone(), start_time);
-            db.add_task_entry(&new_task)?;
-
-            println!(
-                "{} started at {}",
-                new_task_name,
-                start_time.to_string_hhmm()
-            );
+            subcommand::start::run(
+                &mut db,
+                opts.task_number,
+                opts.break_time,
+                opts.time,
+                break_time_taskname,
+            )?;
         }
 
         SubCommand::End(opts) => {
-            // build end time
-            let end_time = match opts.time {
-                Some(t) => TaskTime::parse_from_str_hhmm(&t)?,
-                None => TaskTime::now(),
-            };
-
-            let db = Database::connect_rw(&db_path)?;
-
-            // fill end time of the current task
-            if let Some(current_task_id) = db.get_current_task_id()? {
-                let mut current_task = db.get_task(current_task_id)?;
-
-                let updated_task = current_task.set_end_time(Some(end_time));
-                db.update_task(current_task_id, &updated_task)?;
-
-                db.reset_manager()?;
-
-                println!(
-                    "{} ended at {}",
-                    &current_task.name(),
-                    &end_time.to_string_hhmm()
-                );
-            }
+            let mut db = Database::connect_rw(&db_path)?;
+            subcommand::end::run(&mut db, opts.time)?;
         }
 
         SubCommand::List(opts) => {
             let db = Database::connect_rw(&db_path)?;
-
-            let date = match opts.date {
-                Some(date) => WorkDate::parse_from_str(&date)?,
-                None => WorkDate::now(),
-            };
-            let tasks_with_num = db.get_tasks(opts.all, Some(date))?;
-
-            // show details
-            let mut stdout = StandardStream::stdout(ColorChoice::Auto);
-            stdout.lock();
-
-            write_bold(&mut stdout, "List\n")?;
-            writeln!(
-                &mut stdout,
-                "{:<10}  {:<2}  {:<5} - {:<5}  {:<8}  {:<20}",
-                "Date", "No", "Start", "End", "Duration", "Task"
-            )?;
-
-            let mut tasks: Vec<Task> = Vec::new();
-            let mut breaks: Vec<Task> = Vec::new();
-
-            for (n, task) in tasks_with_num {
-                writeln!(
-                    &mut stdout,
-                    "{:<10}  {:>2}  {:<5} - {:<5}  {:<8}  {:<20}",
-                    task.working_date().to_string(),
-                    n,
-                    task.start_time().to_string_hhmm(),
-                    match task.end_time() {
-                        Some(t) => t.to_string_hhmm(),
-                        None => String::from(""),
-                    },
-                    task.duration_hhmm(),
-                    task.name(),
-                )?;
-
-                if task.name() == break_time_taskname {
-                    breaks.push(task);
-                } else {
-                    tasks.push(task);
-                };
-            }
-            writeln!(&mut stdout, "")?;
-
-            // show summary
-            if !opts.all {
-                if let Some(summary) = TaskList::new(tasks).summary() {
-                    write_bold(&mut stdout, "Start    : ")?;
-                    writeln!(&mut stdout, "{}", summary.start().to_string_hhmm())?;
-
-                    write_bold(&mut stdout, "End      : ")?;
-                    writeln!(&mut stdout, "{}", summary.end().to_string_hhmm())?;
-
-                    write_bold(&mut stdout, "Duration : ")?;
-                    writeln!(
-                        &mut stdout,
-                        "{}\n",
-                        summary.duration_total().to_string_hhmm()
-                    )?;
-
-                    // total time
-                    let mut names: Vec<String> =
-                        summary.duration_by_taskname().keys().cloned().collect();
-                    names.sort();
-
-                    write_bold(&mut stdout, "Task duration\n")?;
-                    for name in names {
-                        let dur = summary
-                            .duration_by_taskname()
-                            .get(&name)
-                            .unwrap()
-                            .to_string_hhmm();
-                        println!("{:<5}  {}", dur, name);
-                    }
-
-                    // break time
-                    write_bold(&mut stdout, "\nBreak\n")?;
-                    for break_time in breaks {
-                        writeln!(
-                            &mut stdout,
-                            "{} - {}",
-                            break_time.start_time().to_string_hhmm(),
-                            match break_time.end_time() {
-                                Some(t) => t.to_string_hhmm(),
-                                None => String::from(""),
-                            }
-                        )?;
-                    }
-                    println!("")
-                }
-            }
+            subcommand::list_log::run(&db, opts.all, opts.date, break_time_taskname)?;
         }
 
         SubCommand::Update(opts) => {
             let db = Database::connect_rw(&db_path)?;
-            let working_date = WorkDate::now();
-
-            let task_id = db.get_task_id_by_seqnum(opts.task_number, working_date)?;
-            let mut task = db.get_task(task_id)?;
-
-            if opts.target == "name" {
-                task.set_name(opts.value);
-            } else if opts.target == "start" {
-                task.set_start_time(TaskTime::parse_from_str_hhmm(&opts.value)?);
-            } else if opts.target == "end" {
-                task.set_end_time(Some(TaskTime::parse_from_str_hhmm(&opts.value)?));
-            }
-
-            db.update_task(task.id().unwrap(), &task)?;
+            subcommand::update::run(&db, opts.task_number, opts.target, opts.value)?;
         }
 
         SubCommand::Delete(opts) => {
             let mut db = Database::connect_rw(&db_path)?;
-            let working_date = WorkDate::now();
-
-            let task_id = db.get_task_id_by_seqnum(opts.task_number, working_date)?;
-            let task = db.get_task(task_id)?;
-
-            eprintln!(
-                "\"{}\" started at {} {}",
-                task.name(),
-                task.working_date().to_string(),
-                task.start_time().to_string_hhmm()
-            );
-
-            let proceed = Confirm::new()
-                .with_prompt("Really delete?")
-                .wait_for_newline(false)
-                .default(false)
-                .show_default(true)
-                .interact()?;
-            if proceed {
-                db.delete_task(task_id)?;
-                println!("\ntask {} deleted", opts.task_number);
-            } else {
-                println!("\nOparation canceled.");
-            };
+            subcommand::delete::run(&mut db, opts.task_number)?;
         }
 
         SubCommand::ShowManager => {
-            let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-            stderr.lock();
-
-            write_bold(
-                &mut stderr,
-                "Warning: This command shows the internal status for debugging the application.\n\n",
-            )?;
-
             let db = Database::connect_r(&db_path)?;
-            let manager = db.get_manager()?;
-            println!("{:?}", manager);
+            subcommand::manager::show(&db)?;
         }
 
         SubCommand::ResetManager => {
-            let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-            stderr.lock();
-
-            write_bold(
-                &mut stderr,
-                "Warning: This operation can be dangerous. It may break your database.\n",
-            )?;
-
-            let proceed = Confirm::new()
-                .with_prompt("Do you wish to continue?")
-                .wait_for_newline(false)
-                .default(false)
-                .show_default(true)
-                .interact()?;
-            if proceed {
-                let db = Database::connect_rw(&db_path)?;
-                db.reset_manager()?;
-                println!("\nManager has been reset.");
-            } else {
-                println!("\nOparation canceled.");
-            };
+            let db = Database::connect_rw(&db_path)?;
+            subcommand::manager::reset(&db)?;
         }
     }
 
