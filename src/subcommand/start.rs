@@ -1,10 +1,9 @@
 use crate::db::Database;
 use crate::task::{Task, TaskTime, TimeDisplay};
 use anyhow::{anyhow, Result};
-use std::path::PathBuf;
 
 pub fn run(
-    db_path: PathBuf,
+    db: &mut Database,
     taskname_number: Option<u32>,
     is_break_time: bool,
     time: Option<String>,
@@ -12,11 +11,9 @@ pub fn run(
 ) -> Result<()> {
     let start_time = build_start_time(time, TaskTime::now())?;
 
-    let mut db = Database::connect_rw(&db_path)?;
-
     // end current task
     if let Some(current_task_id) = db.get_current_task_id()? {
-        let updated_task = fill_end_time(&mut db, current_task_id, &start_time)?;
+        let updated_task = fill_end_time(db, current_task_id, &start_time)?;
 
         println!(
             "{} ended at {}",
@@ -34,7 +31,7 @@ pub fn run(
             None => Err(anyhow!("Task number was not provided")),
         }?
     };
-    let new_task = register_task(&mut db, new_task_name, start_time)?;
+    let new_task = register_task(db, new_task_name, start_time)?;
 
     println!(
         "{} started at {}",

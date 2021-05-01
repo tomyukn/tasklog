@@ -2,17 +2,14 @@ use crate::db::Database;
 use crate::task::{Task, TaskList, TaskSummary, TimeDisplay, WorkDate};
 use anyhow::Result;
 use prettytable::{format, table, Row, Table};
-use std::path::PathBuf;
 
 /// Print task log
 pub fn run(
-    db_path: PathBuf,
+    db: &Database,
     show_all: bool,
     date: Option<String>,
     break_taskname: &str,
 ) -> Result<()> {
-    let db = Database::connect_rw(&db_path)?;
-
     let date = build_date(date, WorkDate::now())?;
     let tasks_with_seq = db.get_tasks(show_all, Some(date))?;
 

@@ -157,24 +157,29 @@ fn main() -> Result<()> {
 
     match root_opts.subcmd {
         SubCommand::Init(opts) => {
-            subcommand::init::run(db_path, opts.force)?;
+            let mut db = Database::connect_rwc(&db_path)?;
+            subcommand::init::run(&mut db, opts.force)?;
         }
 
         SubCommand::Register(opts) => {
-            subcommand::register::run(db_path, &opts.task_name)?;
+            let mut db = Database::connect_rw(&db_path)?;
+            subcommand::register::run(&mut db, &opts.task_name)?;
         }
 
         SubCommand::Unregister(opts) => {
-            subcommand::unregister::run(db_path, &opts.task_name)?;
+            let mut db = Database::connect_rw(&db_path)?;
+            subcommand::unregister::run(&mut db, &opts.task_name)?;
         }
 
         SubCommand::Tasks => {
-            subcommand::show_tasks::run(db_path)?;
+            let db = Database::connect_r(&db_path)?;
+            subcommand::show_tasks::run(&db)?;
         }
 
         SubCommand::Start(opts) => {
+            let mut db = Database::connect_rw(&db_path)?;
             subcommand::start::run(
-                db_path,
+                &mut db,
                 opts.task_number,
                 opts.break_time,
                 opts.time,
@@ -183,15 +188,18 @@ fn main() -> Result<()> {
         }
 
         SubCommand::End(opts) => {
-            subcommand::end::run(db_path, opts.time)?;
+            let mut db = Database::connect_rw(&db_path)?;
+            subcommand::end::run(&mut db, opts.time)?;
         }
 
         SubCommand::List(opts) => {
-            subcommand::list_log::run(db_path, opts.all, opts.date, break_time_taskname)?;
+            let db = Database::connect_rw(&db_path)?;
+            subcommand::list_log::run(&db, opts.all, opts.date, break_time_taskname)?;
         }
 
         SubCommand::Update(opts) => {
-            subcommand::update::run(db_path, opts.task_number, opts.target, opts.value)?;
+            let db = Database::connect_rw(&db_path)?;
+            subcommand::update::run(&db, opts.task_number, opts.target, opts.value)?;
         }
 
         SubCommand::Delete(opts) => {
@@ -201,12 +209,12 @@ fn main() -> Result<()> {
 
         SubCommand::ShowManager => {
             let db = Database::connect_r(&db_path)?;
-            subcommand::manager::show(db)?;
+            subcommand::manager::show(&db)?;
         }
 
         SubCommand::ResetManager => {
             let db = Database::connect_rw(&db_path)?;
-            subcommand::manager::reset(db)?;
+            subcommand::manager::reset(&db)?;
         }
     }
 

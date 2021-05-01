@@ -1,10 +1,8 @@
 use crate::db::Database;
 use crate::task::{TaskTime, WorkDate};
 use anyhow::Result;
-use std::path::PathBuf;
 
-pub fn run(db_path: PathBuf, task_number: u32, target: String, value: String) -> Result<()> {
-    let db = Database::connect_rw(&db_path)?;
+pub fn run(db: &Database, task_number: u32, target: String, value: String) -> Result<()> {
     let working_date = WorkDate::now();
 
     let task_id = db.get_task_id_by_seqnum(task_number, working_date)?;

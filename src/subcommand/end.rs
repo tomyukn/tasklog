@@ -1,20 +1,17 @@
 use crate::db::Database;
 use crate::task::{Task, TaskTime, TimeDisplay};
 use anyhow::Result;
-use std::path::PathBuf;
 
-pub fn run(db_path: PathBuf, time: Option<String>) -> Result<()> {
+pub fn run(db: &mut Database, time: Option<String>) -> Result<()> {
     // build end time
     let end_time = match time {
         Some(t) => TaskTime::parse_from_str_hhmm(&t)?,
         None => TaskTime::now(),
     };
 
-    let mut db = Database::connect_rw(&db_path)?;
-
     // fill end time of the current task
     if let Some(current_task_id) = db.get_current_task_id()? {
-        let updated_task = fill_end_time(&mut db, current_task_id, &end_time)?;
+        let updated_task = fill_end_time(db, current_task_id, &end_time)?;
         db.reset_manager()?;
 
         println!(

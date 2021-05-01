@@ -1,11 +1,9 @@
 use crate::db::Database;
 use anyhow::Result;
-use std::path::PathBuf;
 
 /// Run init subcommand.
-pub fn run(db_path: PathBuf, force_init: bool) -> Result<()> {
-    let mut db = Database::connect_rwc(&db_path)?;
-    initialize_db(&mut db, force_init)?;
+pub fn run(db: &mut Database, force_init: bool) -> Result<()> {
+    initialize_db(db, force_init)?;
 
     Ok(())
 }

@@ -5,7 +5,7 @@ use std::io::Write;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 /// Print the manager database entry.
-pub fn show(db: Database) -> Result<()> {
+pub fn show(db: &Database) -> Result<()> {
     let mut stderr = StandardStream::stderr(ColorChoice::Auto);
     stderr.lock();
 
@@ -22,7 +22,7 @@ pub fn show(db: Database) -> Result<()> {
 }
 
 /// Reset the manager status.
-pub fn reset(db: Database) -> Result<()> {
+pub fn reset(db: &Database) -> Result<()> {
     let mut stderr = StandardStream::stderr(ColorChoice::Auto);
     stderr.lock();
 
