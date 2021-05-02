@@ -4,12 +4,7 @@ use anyhow::Result;
 use prettytable::{format, table, Row, Table};
 
 /// Print task log
-pub fn run(
-    db: &Database,
-    show_all: bool,
-    date: Option<String>,
-    break_taskname: &str,
-) -> Result<()> {
+pub fn run(db: &Database, show_all: bool, date: Option<String>) -> Result<()> {
     let date = build_date(date, WorkDate::now())?;
     let tasks_with_seq = db.get_tasks(show_all, Some(date))?;
 
@@ -18,21 +13,16 @@ pub fn run(
 
     // show details
     let mut tasks: Vec<Task> = Vec::new();
-    let mut breaks: Vec<Task> = Vec::new();
 
     for (_, task) in tasks_with_seq {
-        if task.name() == break_taskname {
-            breaks.push(task);
-        } else {
-            tasks.push(task);
-        };
+        tasks.push(task);
     }
 
     // show summary
     if !show_all {
         if let Some(task_summary) = TaskList::new(tasks).summary() {
             println!("");
-            print_summary(task_summary, breaks)?;
+            print_summary(task_summary)?;
         }
     }
 
@@ -76,7 +66,7 @@ fn print_list(task_list: Vec<(u32, Task)>) -> Result<()> {
 }
 
 // Print task summary
-fn print_summary(task_summary: TaskSummary, breaks: Vec<Task>) -> Result<()> {
+fn print_summary(task_summary: TaskSummary) -> Result<()> {
     let container_format = *format::consts::FORMAT_CLEAN;
     let table_format = format::FormatBuilder::new()
         .separator(
@@ -113,8 +103,8 @@ fn print_summary(task_summary: TaskSummary, breaks: Vec<Task>) -> Result<()> {
 
     // break times
     let mut table_breaks = build_summary_table_structure(row!["Break"], table_format);
-    if !breaks.is_empty() {
-        for b in breaks {
+    if !task_summary.break_times().is_empty() {
+        for b in task_summary.break_times() {
             let start = b.start_time().to_string_hhmm();
             let end = match b.end_time() {
                 Some(t) => t.to_string_hhmm(),

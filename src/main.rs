@@ -151,9 +151,10 @@ struct DeleteOpts {
 }
 
 fn main() -> Result<()> {
+    const BREAK_TIME_TASKNAME: &str = "break time";
+
     let root_opts = Opts::parse();
     let db_path = get_db_path_from_env_var_or("tasklog.db")?;
-    let break_time_taskname = "break time";
 
     match root_opts.subcmd {
         SubCommand::Init(opts) => {
@@ -183,7 +184,7 @@ fn main() -> Result<()> {
                 opts.task_number,
                 opts.break_time,
                 opts.time,
-                break_time_taskname,
+                BREAK_TIME_TASKNAME,
             )?;
         }
 
@@ -194,7 +195,7 @@ fn main() -> Result<()> {
 
         SubCommand::List(opts) => {
             let db = Database::connect_rw(&db_path)?;
-            subcommand::list_log::run(&db, opts.all, opts.date, break_time_taskname)?;
+            subcommand::list_log::run(&db, opts.all, opts.date)?;
         }
 
         SubCommand::Update(opts) => {

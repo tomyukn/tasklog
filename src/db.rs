@@ -78,7 +78,8 @@ impl Database {
                 working_date TEXT,\
                 seq_num INTEGER,\
                 start_time TEXT,\
-                end_time TEXT \
+                end_time TEXT, \
+                is_break INTEGER \
             )",
             [],
         )?;
@@ -240,13 +241,14 @@ impl Database {
             Some(time) => time.to_string(),
             None => String::from(""),
         };
+        let is_break = *task.is_break_time() as i32;
 
         let tx = self.conn.transaction()?;
 
         &tx.execute(
-            "INSERT INTO tasks (name, working_date, start_time, end_time) \
-            VALUES (?1, ?2, ?3, ?4)",
-            params![task_name, working_date, start_time, end_time],
+            "INSERT INTO tasks (name, working_date, start_time, end_time, is_break) \
+            VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![task_name, working_date, start_time, end_time, is_break],
         )?;
 
         let task_id = tx.query_row(
@@ -288,7 +290,7 @@ impl Database {
     /// Get a task from the database by id.
     pub fn get_task(&self, id: u32) -> Result<Task> {
         let task: Task = self.conn.query_row(
-            "SELECT id, name, start_time, end_time \
+            "SELECT id, name, start_time, end_time, is_break \
             FROM tasks \
             WHERE id = ?1",
             params![id],
@@ -303,7 +305,15 @@ impl Database {
                         Err(_) => None,
                     }
                 };
-                Ok(Task::new(Some(id), name, start_time, end_time))
+                let is_break_time = row.get_unwrap::<_, bool>(4);
+
+                Ok(Task::new(
+                    Some(id),
+                    name,
+                    start_time,
+                    end_time,
+                    is_break_time,
+                ))
             },
         )?;
 
@@ -338,7 +348,7 @@ impl Database {
     /// Get all task logs from the database, retruns vec of (sequence number, task) pairs
     pub fn get_tasks(&self, all: bool, working_date: Option<WorkDate>) -> Result<Vec<(u32, Task)>> {
         let sql = format!(
-            "SELECT seq_num, id, name, start_time, end_time \
+            "SELECT seq_num, id, name, start_time, end_time, is_break \
             FROM tasks \
             {} \
             ORDER BY working_date, seq_num",
@@ -365,8 +375,12 @@ impl Database {
                     Err(_) => None,
                 }
             };
+            let is_break_time = row.get_unwrap::<_, bool>(5);
 
-            Ok((seq_num, Task::new(Some(id), name, start_time, end_time)))
+            Ok((
+                seq_num,
+                Task::new(Some(id), name, start_time, end_time, is_break_time),
+            ))
         })?;
 
         let mut tuples = Vec::new();
@@ -385,8 +399,9 @@ impl Database {
                 name = ?1,\
                 working_date = ?2,\
                 start_time = ?3,\
-                end_time = ?4\
-            WHERE id = ?5",
+                end_time = ?4,\
+                is_break = ?5 \
+            WHERE id = ?6",
             params![
                 updated_task.name(),
                 updated_task.working_date().to_string(),
@@ -394,6 +409,7 @@ impl Database {
                 updated_task
                     .end_time()
                     .map_or(String::from(""), |t| t.to_string()),
+                *updated_task.is_break_time() as i32,
                 id
             ],
         )?;
@@ -641,12 +657,13 @@ mod tests {
             String::from("task a"),
             TaskTime::from(start_time),
             None,
+            false,
         );
         db.add_task_entry(&task)?;
 
         // `tasks` table
         let id = db.conn.query_row(
-            "SELECT name, working_date, seq_num, start_time, end_time, id FROM tasks",
+            "SELECT name, working_date, seq_num, start_time, end_time, is_break, id FROM tasks",
             [],
             |row| {
                 assert_eq!(row.get::<_, String>(0)?, String::from("task a"));
@@ -657,8 +674,9 @@ mod tests {
                     String::from("2021-01-01T10:50:00")
                 );
                 assert_eq!(row.get::<_, String>(4)?, String::from(""));
+                assert_eq!(row.get::<_, bool>(5)?, false);
 
-                let id = row.get::<_, u32>(5)?;
+                let id = row.get::<_, u32>(6)?;
                 Ok(id)
             },
         )?;
@@ -694,6 +712,7 @@ mod tests {
             String::from("task a"),
             TaskTime::from(start_time),
             None,
+            false,
         );
         db.add_task_entry(&task)?;
         assert_eq!(db.get_current_task_id()?.unwrap(), 1);
@@ -704,6 +723,7 @@ mod tests {
             String::from("task b"),
             TaskTime::from(start_time),
             None,
+            false,
         );
         db.add_task_entry(&task)?;
         assert_eq!(db.get_current_task_id()?.unwrap(), 2);
@@ -721,6 +741,7 @@ mod tests {
                 String::from("task a"),
                 TaskTime::from(start_time),
                 None,
+                false,
             );
             db.add_task_entry(&task)?;
         }
@@ -731,6 +752,7 @@ mod tests {
                 String::from("task b"),
                 TaskTime::from(start_time),
                 None,
+                false,
             );
             db.add_task_entry(&task)?;
         }
@@ -741,6 +763,7 @@ mod tests {
                 String::from("task c"),
                 TaskTime::from(start_time),
                 None,
+                false,
             );
             db.add_task_entry(&task)?;
         }
@@ -751,6 +774,7 @@ mod tests {
                 String::from("task d"),
                 TaskTime::from(start_time),
                 None,
+                false,
             );
             db.add_task_entry(&task)?;
         }
@@ -778,6 +802,7 @@ mod tests {
             String::from("task a"),
             TaskTime::from(start_time),
             Some(TaskTime::from(end_time)),
+            false,
         );
         db.add_task_entry(&task1)?;
 
@@ -787,6 +812,7 @@ mod tests {
             String::from("task b"),
             TaskTime::from(start_time),
             None,
+            false,
         );
         db.add_task_entry(&task2)?;
 
@@ -796,6 +822,7 @@ mod tests {
             String::from("task c"),
             TaskTime::from(start_time),
             None,
+            true,
         );
         db.add_task_entry(&task3)?;
 
@@ -805,6 +832,7 @@ mod tests {
             String::from("task d"),
             TaskTime::from(start_time),
             None,
+            false,
         );
         db.add_task_entry(&task4)?;
 
@@ -844,6 +872,7 @@ mod tests {
             String::from("task a"),
             TaskTime::from(start_time1),
             None,
+            true,
         );
         db.add_task_entry(&task_pre)?;
 
@@ -852,10 +881,11 @@ mod tests {
             String::from("task b"),
             TaskTime::from(start_time2),
             Some(TaskTime::from(end_time)),
+            false,
         );
         db.update_task(1, &task_post1)?;
         db.conn.query_row(
-            "SELECT id, name, working_date, seq_num, start_time, end_time FROM tasks",
+            "SELECT id, name, working_date, seq_num, start_time, end_time, is_break FROM tasks",
             [],
             |row| {
                 assert_eq!(row.get::<_, u32>(0)?, 1);
@@ -870,6 +900,7 @@ mod tests {
                     row.get::<_, String>(5)?,
                     String::from("2021-01-02T11:50:00")
                 );
+                assert_eq!(row.get::<_, bool>(6)?, false);
 
                 Ok(())
             },
@@ -880,10 +911,11 @@ mod tests {
             String::from("task b"),
             TaskTime::from(start_time2),
             None,
+            true,
         );
         db.update_task(1, &task_post2)?;
         db.conn.query_row(
-            "SELECT id, name, working_date, seq_num, start_time, end_time FROM tasks",
+            "SELECT id, name, working_date, seq_num, start_time, end_time, is_break FROM tasks",
             [],
             |row| {
                 assert_eq!(row.get::<_, u32>(0)?, 1);
@@ -895,6 +927,7 @@ mod tests {
                     String::from("2021-01-02T10:00:00")
                 );
                 assert_eq!(row.get::<_, String>(5)?, String::from(""));
+                assert_eq!(row.get::<_, bool>(6)?, true);
 
                 Ok(())
             },
@@ -914,6 +947,7 @@ mod tests {
             String::from("task a"),
             TaskTime::from(start_time),
             None,
+            false,
         );
         db.add_task_entry(&task1)?;
 
@@ -922,12 +956,13 @@ mod tests {
             String::from("task b"),
             TaskTime::from(start_time),
             None,
+            false,
         );
         db.add_task_entry(&task2)?;
         db.delete_task(1)?;
 
         db.conn.query_row(
-            "SELECT id, name, working_date, seq_num, start_time, end_time FROM tasks",
+            "SELECT id, name, working_date, seq_num, start_time, end_time, is_break FROM tasks",
             [],
             |row| {
                 assert_eq!(row.get::<_, u32>(0)?, 2);
@@ -939,6 +974,7 @@ mod tests {
                     String::from("2021-01-01T10:50:00")
                 );
                 assert_eq!(row.get::<_, String>(5)?, String::from(""));
+                assert_eq!(row.get::<_, bool>(6)?, false);
 
                 Ok(())
             },
