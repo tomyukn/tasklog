@@ -34,6 +34,8 @@ pub struct Task {
     start_time: TaskTime,
     #[getset(get = "pub", set = "pub")]
     end_time: Option<TaskTime>,
+    #[getset(get = "pub", set = "pub")]
+    is_break_time: bool,
 }
 
 impl Task {
@@ -43,18 +45,20 @@ impl Task {
         name: String,
         start_time: TaskTime,
         end_time: Option<TaskTime>,
+        is_break_time: bool,
     ) -> Self {
         Self {
             id,
             name,
             start_time,
             end_time,
+            is_break_time,
         }
     }
 
     /// Start a new task.
-    pub fn start(name: String, time: TaskTime) -> Self {
-        Self::new(None, name, time, None)
+    pub fn start(name: String, time: TaskTime, is_break_time: bool) -> Self {
+        Self::new(None, name, time, None, is_break_time)
     }
 
     /// End the task.
@@ -117,36 +121,44 @@ impl TaskList {
             .map(|task| task.end_time().unwrap_or(*task.start_time()))
             .collect::<Vec<_>>();
 
+        // overall start and end
         let start_first = start_times.clone().into_iter().min().unwrap();
         let end_last = end_times.clone().into_iter().max().unwrap();
-
-        let task_names = tasks.iter().map(|task| task.name()).collect::<Vec<_>>();
-
-        let durations = tasks
-            .iter()
-            .map(|task| task.duration().unwrap_or(Duration::seconds(0)))
-            .collect::<Vec<_>>();
-
         let duration_total = tasks
             .iter()
-            .filter(|task| task.duration().is_some())
+            .filter(|task| !task.is_break_time && task.duration().is_some())
             .fold(Duration::seconds(0), |acc, task| {
                 acc + task.duration().unwrap()
             });
 
-        // compute total duration by each task
-        let mut durations_map: HashMap<String, Duration> = HashMap::new();
+        // separate tasks to working and break
+        let mut tasks_working = Vec::new();
+        let mut tasks_break = Vec::new();
+        for task in tasks {
+            if task.is_break_time {
+                tasks_break.push(task);
+            } else {
+                tasks_working.push(task);
+            }
+        }
 
-        let mut task_names_uniq = task_names.clone();
+        // sum durations by same tasks (without break times)
+        let mut task_names_uniq = tasks_working
+            .iter()
+            .map(|task| task.name())
+            .collect::<Vec<_>>();
         task_names_uniq.sort();
         task_names_uniq.dedup();
 
-        // placeholder
+        let mut durations_map: HashMap<String, Duration> = HashMap::new();
         for name in task_names_uniq {
             durations_map.insert(name.to_string(), Duration::seconds(0));
         }
 
-        for (name, duration) in task_names.into_iter().zip(durations) {
+        for (name, duration) in tasks_working
+            .iter()
+            .map(|task| (task.name(), task.duration().unwrap_or(Duration::seconds(0))))
+        {
             let duration_acc = durations_map.get(name).unwrap().clone();
             durations_map.insert(name.to_string(), duration_acc + duration);
         }
@@ -156,6 +168,7 @@ impl TaskList {
             end: end_last,
             duration_total,
             duration_by_taskname: durations_map,
+            break_times: tasks_break,
         })
     }
 }
@@ -171,6 +184,8 @@ pub struct TaskSummary {
     duration_total: Duration,
     #[getset(get = "pub")]
     duration_by_taskname: HashMap<String, Duration>,
+    #[getset(get = "pub")]
+    break_times: Vec<Task>,
 }
 
 /// A *date* for tasks which are considered belonging to the same day.
@@ -288,14 +303,15 @@ mod tests {
     #[test]
     fn test_task_start() {
         let start_time = TaskTime(NaiveDate::from_ymd(2021, 1, 2).and_hms(11, 6, 0));
-        let task = Task::start(String::from("task a"), start_time);
+        let task = Task::start(String::from("task a"), start_time, false);
         assert_eq!(
             task,
             Task {
                 id: None,
                 name: String::from("task a"),
                 start_time: start_time,
-                end_time: None
+                end_time: None,
+                is_break_time: false
             },
         );
     }
@@ -308,6 +324,7 @@ mod tests {
             name: String::from("task a"),
             start_time: start_time,
             end_time: None,
+            is_break_time: false,
         };
 
         let end_time1 = TaskTime(NaiveDate::from_ymd(2021, 1, 2).and_hms(11, 30, 0));
@@ -317,7 +334,8 @@ mod tests {
                 id: None,
                 name: String::from("task a"),
                 start_time: start_time,
-                end_time: Some(end_time1)
+                end_time: Some(end_time1),
+                is_break_time: false
             },
         );
 
@@ -348,9 +366,15 @@ mod tests {
         let s3 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(10, 40, 0));
         let e3 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(10, 55, 0));
 
-        let task1 = Task::start(String::from("task a"), s1).end(e1).unwrap();
-        let task2 = Task::start(String::from("task b"), s2).end(e2).unwrap();
-        let task3 = Task::start(String::from("task a"), s3).end(e3).unwrap();
+        let task1 = Task::start(String::from("task a"), s1, false)
+            .end(e1)
+            .unwrap();
+        let task2 = Task::start(String::from("task b"), s2, false)
+            .end(e2)
+            .unwrap();
+        let task3 = Task::start(String::from("task a"), s3, false)
+            .end(e3)
+            .unwrap();
 
         let tasklist = TaskList::new(vec![]);
         assert!(tasklist.summary().is_none());
@@ -366,8 +390,48 @@ mod tests {
             Some(TaskSummary {
                 start: s1,
                 end: e3,
-                duration_total: e3 - s1,
-                duration_by_taskname: duration_map
+                duration_total: Duration::minutes(55),
+                duration_by_taskname: duration_map,
+                break_times: vec![]
+            })
+        );
+    }
+
+    #[test]
+    fn test_tasklist_summary_with_break_time() {
+        let s1 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(10, 0, 0));
+        let e1 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(10, 30, 0));
+        let s2 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(10, 30, 0));
+        let e2 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(10, 40, 0));
+        let s3 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(10, 40, 0));
+        let e3 = TaskTime(NaiveDate::from_ymd(2015, 9, 19).and_hms(10, 55, 0));
+
+        let task1 = Task::start(String::from("task a"), s1, true)
+            .end(e1)
+            .unwrap();
+        let task2 = Task::start(String::from("task b"), s2, false)
+            .end(e2)
+            .unwrap();
+        let task3 = Task::start(String::from("task c"), s3, true)
+            .end(e3)
+            .unwrap();
+
+        let tasklist = TaskList::new(vec![]);
+        assert!(tasklist.summary().is_none());
+
+        let tasklist = TaskList::new(vec![task1.clone(), task2, task3.clone()]);
+
+        let mut duration_map = HashMap::new();
+        duration_map.insert(String::from("task b"), Duration::minutes(10));
+
+        assert_eq!(
+            tasklist.summary(),
+            Some(TaskSummary {
+                start: s1,
+                end: e3,
+                duration_total: Duration::minutes(10),
+                duration_by_taskname: duration_map,
+                break_times: vec![task1, task3]
             })
         );
     }

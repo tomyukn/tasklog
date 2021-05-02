@@ -31,7 +31,7 @@ pub fn run(
             None => Err(anyhow!("Task number was not provided")),
         }?
     };
-    let new_task = register_task(db, new_task_name, start_time)?;
+    let new_task = register_task(db, new_task_name, start_time, is_break_time)?;
 
     println!(
         "{} started at {}",
@@ -62,8 +62,13 @@ fn fill_end_time(db: &mut Database, task_id: u32, end_time: &TaskTime) -> Result
 }
 
 // start a task and register it to the database
-fn register_task(db: &mut Database, task_name: String, start_time: TaskTime) -> Result<Task> {
-    let new_task = Task::start(task_name, start_time);
+fn register_task(
+    db: &mut Database,
+    task_name: String,
+    start_time: TaskTime,
+    is_break_time: bool,
+) -> Result<Task> {
+    let new_task = Task::start(task_name, start_time, is_break_time);
     db.add_task_entry(&new_task)?;
 
     Ok(new_task)
