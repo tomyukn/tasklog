@@ -7,9 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changes
+### Changed
 
-- Refine outputs of `tasks` and `list` subcommands.
+- Improve outputs of `tasks` and `list` subcommands.
+- Change database structure.
 
 ## [0.3.0] - 2021-04-28
 
@@ -18,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `show-manager` subcommand.
 - Add `reset-manager` subcommand.
 
-### Changes
+### Changed
 
 - Color outputs.
 - Ask for confirmation when using `delete` subcommand.
