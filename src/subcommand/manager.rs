@@ -12,7 +12,7 @@ pub fn show(db: &Database) -> Result<()> {
     write_boldred(&mut stderr, "Warning")?;
     writeln!(
         &mut stderr,
-        ": This command shows the internal status for debugging the application.\n"
+        ": This command shows the internal status of the application for debugging purpose.\n"
     )?;
 
     let manager = db.get_manager()?;
@@ -38,11 +38,12 @@ pub fn reset(db: &Database) -> Result<()> {
         .default(false)
         .show_default(true)
         .interact()?;
+
     if proceed {
         db.reset_manager()?;
-        println!("\nManager has been reset.");
+        eprintln!("\nManager has been reset.");
     } else {
-        println!("\nOparation canceled.");
+        eprintln!("\nOparation canceled.");
     };
 
     Ok(())
@@ -53,5 +54,6 @@ fn write_boldred(out: &mut StandardStream, s: &str) -> std::io::Result<()> {
     out.set_color(ColorSpec::new().set_fg(Some(Color::Red)).set_bold(true))?;
     write!(out, "{}", s)?;
     out.reset()?;
+
     Ok(())
 }

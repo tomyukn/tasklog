@@ -51,7 +51,7 @@ impl Database {
     }
 
     /// Check whether the tables are crated.
-    pub fn is_prepared(&self) -> Result<bool> {
+    pub fn is_ready(&self) -> Result<bool> {
         let count = self.conn.query_row(
             "SELECT count(name) \
             FROM sqlite_master \
@@ -210,8 +210,8 @@ impl Database {
         Ok(taskname)
     }
 
-    /// Get all task names and its number from the database.
-    pub fn get_tasknames(&self) -> Result<Vec<(u32, String)>> {
+    /// Get all task names and its sequence number from the database.
+    pub fn get_registered_tasknames(&self) -> Result<Vec<(u32, String)>> {
         let mut stmt = self.conn.prepare(
             "SELECT seq_num, task_name \
             FROM tasknames \
@@ -540,26 +540,26 @@ mod tests {
     }
 
     #[test]
-    fn test_database_is_not_prepared() -> Result<(), Box<dyn Error>> {
+    fn test_database_is_not_ready() -> Result<(), Box<dyn Error>> {
         let db = Database {
             conn: Connection::open_in_memory()?,
             location: DatabaseLocation::Memory,
         };
 
-        assert!(!db.is_prepared()?);
+        assert!(!db.is_ready()?);
 
         Ok(())
     }
 
     #[test]
-    fn test_database_is_prepared() -> Result<(), Box<dyn Error>> {
+    fn test_database_is_ready() -> Result<(), Box<dyn Error>> {
         let mut db = Database {
             conn: Connection::open_in_memory()?,
             location: DatabaseLocation::Memory,
         };
 
         db.initialize()?;
-        assert!(db.is_prepared()?);
+        assert!(db.is_ready()?);
 
         Ok(())
     }
@@ -628,7 +628,7 @@ mod tests {
 
         db.register_taskname("task b")?;
         db.register_taskname("task a")?;
-        let all_names = db.get_tasknames()?;
+        let all_names = db.get_registered_tasknames()?;
         assert_eq!(
             all_names,
             vec![(1, String::from("task a")), (2, String::from("task b"))]
@@ -641,7 +641,7 @@ mod tests {
     fn try_get_all_taskname_if_not_exist() -> Result<(), Box<dyn Error>> {
         let db = setup_db()?;
 
-        let all_names = db.get_tasknames()?;
+        let all_names = db.get_registered_tasknames()?;
         assert_eq!(all_names, vec![]);
 
         Ok(())

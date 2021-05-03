@@ -11,15 +11,22 @@ pub fn run(db: &mut Database, time: Option<String>) -> Result<()> {
 
     // fill end time of the current task
     if let Some(current_task_id) = db.get_current_task_id()? {
-        let updated_task = fill_end_time(db, current_task_id, &end_time)?;
-        db.reset_manager()?;
-
-        println!(
-            "{} ended at {}",
-            &updated_task.name(),
-            &updated_task.end_time().unwrap().to_string_hhmm()
-        );
+        end_task(db, current_task_id, &end_time)?;
     }
+
+    Ok(())
+}
+
+/// End current task.
+pub fn end_task(db: &mut Database, task_id: u32, end_time: &TaskTime) -> Result<()> {
+    let updated_task = fill_end_time(db, task_id, &end_time)?;
+    db.reset_manager()?;
+
+    println!(
+        "{} ended at {}",
+        &updated_task.name(),
+        &updated_task.end_time().unwrap().to_string_hhmm()
+    );
 
     Ok(())
 }

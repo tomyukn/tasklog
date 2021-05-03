@@ -1,4 +1,5 @@
 use crate::db::Database;
+use crate::subcommand::end::end_task;
 use crate::task::{Task, TaskTime, TimeDisplay};
 use anyhow::{anyhow, Result};
 
@@ -13,23 +14,16 @@ pub fn run(
 
     // end current task
     if let Some(current_task_id) = db.get_current_task_id()? {
-        let updated_task = fill_end_time(db, current_task_id, &start_time)?;
-
-        println!(
-            "{} ended at {}",
-            updated_task.name(),
-            updated_task.end_time().unwrap().to_string_hhmm()
-        );
+        end_task(db, current_task_id, &start_time)?;
     }
 
     // start new task
-    let new_task_name = if is_break_time {
-        String::from(break_taskname)
-    } else {
-        match taskname_number {
+    let new_task_name = match is_break_time {
+        true => String::from(break_taskname),
+        false => match taskname_number {
             Some(n) => db.get_taskname(n),
             None => Err(anyhow!("Task number was not provided")),
-        }?
+        }?,
     };
     let new_task = register_task(db, new_task_name, start_time, is_break_time)?;
 
@@ -50,15 +44,6 @@ fn build_start_time(time: Option<String>, default: TaskTime) -> Result<TaskTime>
     };
 
     Ok(start_time)
-}
-
-/// Fill the end time.
-fn fill_end_time(db: &mut Database, task_id: u32, end_time: &TaskTime) -> Result<Task> {
-    let mut task = db.get_task(task_id)?;
-    task.set_end_time(Some(*end_time));
-    db.update_task(task_id, &task)?;
-
-    Ok(task)
 }
 
 // start a task and register it to the database

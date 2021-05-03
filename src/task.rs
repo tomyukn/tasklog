@@ -166,8 +166,8 @@ impl TaskList {
         }
 
         Some(TaskSummary {
-            start: start_first,
-            end: end_last,
+            start_time: start_first,
+            end_time: end_last,
             duration_total,
             duration_by_taskname: durations_map,
             break_times: tasks_break,
@@ -188,9 +188,9 @@ impl IntoIterator for TaskList {
 #[derive(Clone, PartialEq, Eq, Debug, Getters)]
 pub struct TaskSummary {
     #[getset(get = "pub")]
-    start: TaskTime,
+    start_time: TaskTime,
     #[getset(get = "pub")]
-    end: TaskTime,
+    end_time: TaskTime,
     #[getset(get = "pub")]
     duration_total: Duration,
     #[getset(get = "pub")]
@@ -399,8 +399,8 @@ mod tests {
         assert_eq!(
             tasklist.summary(),
             Some(TaskSummary {
-                start: s1,
-                end: e3,
+                start_time: s1,
+                end_time: e3,
                 duration_total: Duration::minutes(55),
                 duration_by_taskname: duration_map,
                 break_times: vec![]
@@ -438,8 +438,8 @@ mod tests {
         assert_eq!(
             tasklist.summary(),
             Some(TaskSummary {
-                start: s1,
-                end: e3,
+                start_time: s1,
+                end_time: e3,
                 duration_total: Duration::minutes(10),
                 duration_by_taskname: duration_map,
                 break_times: vec![task1, task3]

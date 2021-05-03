@@ -22,11 +22,12 @@ pub fn run(db: &mut Database, task_number: u32) -> Result<()> {
         .default(false)
         .show_default(true)
         .interact()?;
+
     if proceed {
         db.delete_task(task_id)?;
-        println!("\ntask {} deleted", task_number);
+        eprintln!("\ntask {} deleted", task_number);
     } else {
-        println!("\nOparation canceled.");
+        eprintln!("\nOparation canceled.");
     };
 
     Ok(())

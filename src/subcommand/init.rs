@@ -10,7 +10,7 @@ pub fn run(db: &mut Database, force_init: bool) -> Result<()> {
 
 /// Initialize a database.
 fn initialize_db(db: &mut Database, force: bool) -> Result<()> {
-    if !db.is_prepared()? || force {
+    if !db.is_ready()? || force {
         db.initialize()?;
         println!("Database created: {}", db.location());
     } else {
