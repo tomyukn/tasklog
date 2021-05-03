@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2021-05-04
+
 ### Changed
 
 - Improve outputs of `tasks` and `list` subcommands.
@@ -48,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix the string representation of the negative duration.
 - Fix a typo in `README.md`.
 
-[Unreleased]: https://github.com/tomyukn/tasklog/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/tomyukn/tasklog/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/tomyukn/tasklog/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/tomyukn/tasklog/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tomyukn/tasklog/compare/v0.1.0...v0.2.0
