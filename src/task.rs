@@ -93,13 +93,15 @@ impl Task {
 /// A collection of tasks.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct TaskList {
-    tasks: Vec<Task>,
+    tasks: Vec<(u32, Task)>,
 }
 
 impl TaskList {
     /// Create a `TaskList` from a vec of tasks
-    pub fn new(tasks: Vec<Task>) -> Self {
-        TaskList { tasks }
+    pub fn new(tasks_with_seq: Vec<(u32, Task)>) -> Self {
+        Self {
+            tasks: tasks_with_seq,
+        }
     }
 
     /// Return the summary of tasks
@@ -112,13 +114,13 @@ impl TaskList {
 
         let start_times = tasks
             .iter()
-            .map(|task| task.start_time().clone())
+            .map(|(_, task)| task.start_time().clone())
             .collect::<Vec<_>>();
 
         // use start time if the end time is missing
         let end_times = tasks
             .iter()
-            .map(|task| task.end_time().unwrap_or(*task.start_time()))
+            .map(|(_, task)| task.end_time().unwrap_or(*task.start_time()))
             .collect::<Vec<_>>();
 
         // overall start and end
@@ -126,15 +128,15 @@ impl TaskList {
         let end_last = end_times.clone().into_iter().max().unwrap();
         let duration_total = tasks
             .iter()
-            .filter(|task| !task.is_break_time && task.duration().is_some())
-            .fold(Duration::seconds(0), |acc, task| {
+            .filter(|(_, task)| !task.is_break_time && task.duration().is_some())
+            .fold(Duration::seconds(0), |acc, (_, task)| {
                 acc + task.duration().unwrap()
             });
 
         // separate tasks to working and break
         let mut tasks_working = Vec::new();
         let mut tasks_break = Vec::new();
-        for task in tasks {
+        for (_, task) in tasks {
             if task.is_break_time {
                 tasks_break.push(task);
             } else {
@@ -170,6 +172,15 @@ impl TaskList {
             duration_by_taskname: durations_map,
             break_times: tasks_break,
         })
+    }
+}
+
+impl IntoIterator for TaskList {
+    type Item = (u32, Task);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.tasks.into_iter()
     }
 }
 
@@ -379,7 +390,7 @@ mod tests {
         let tasklist = TaskList::new(vec![]);
         assert!(tasklist.summary().is_none());
 
-        let tasklist = TaskList::new(vec![task1, task2, task3]);
+        let tasklist = TaskList::new(vec![(0, task1), (1, task2), (2, task3)]);
 
         let mut duration_map = HashMap::new();
         duration_map.insert(String::from("task a"), Duration::minutes(45));
@@ -419,7 +430,7 @@ mod tests {
         let tasklist = TaskList::new(vec![]);
         assert!(tasklist.summary().is_none());
 
-        let tasklist = TaskList::new(vec![task1.clone(), task2, task3.clone()]);
+        let tasklist = TaskList::new(vec![(0, task1.clone()), (1, task2), (2, task3.clone())]);
 
         let mut duration_map = HashMap::new();
         duration_map.insert(String::from("task b"), Duration::minutes(10));

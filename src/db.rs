@@ -1,4 +1,4 @@
-use crate::task::{Task, TaskTime, WorkDate};
+use crate::task::{Task, TaskList, TaskTime, WorkDate};
 use anyhow::{anyhow, Result};
 use getset::Getters;
 use rusqlite::{params, Connection, OpenFlags};
@@ -346,7 +346,7 @@ impl Database {
     }
 
     /// Get all task logs from the database, retruns vec of (sequence number, task) pairs
-    pub fn get_tasks(&self, all: bool, working_date: Option<WorkDate>) -> Result<Vec<(u32, Task)>> {
+    pub fn get_tasks(&self, all: bool, working_date: Option<WorkDate>) -> Result<TaskList> {
         let sql = format!(
             "SELECT seq_num, id, name, start_time, end_time, is_break \
             FROM tasks \
@@ -383,12 +383,12 @@ impl Database {
             ))
         })?;
 
-        let mut tuples = Vec::new();
+        let mut task_list = Vec::new();
         for tuple in rows {
-            tuples.push(tuple?);
+            task_list.push(tuple?);
         }
 
-        Ok(tuples)
+        Ok(TaskList::new(task_list))
     }
 
     /// Update a task log in the database.
@@ -838,22 +838,22 @@ mod tests {
 
         assert_eq!(
             db.get_tasks(false, Some(WorkDate::parse_from_str("2021-01-01")?))?,
-            vec![(1, task1.clone()), (2, task2.clone())]
+            TaskList::new(vec![(1, task1.clone()), (2, task2.clone())])
         );
 
         assert_eq!(
             db.get_tasks(false, Some(WorkDate::parse_from_str("2021-01-02")?))?,
-            vec![(1, task3.clone()), (2, task4.clone())]
+            TaskList::new(vec![(1, task3.clone()), (2, task4.clone())])
         );
 
         assert_eq!(
             db.get_tasks(true, None)?,
-            vec![
+            TaskList::new(vec![
                 (1, task1.clone()),
                 (2, task2.clone()),
                 (1, task3.clone()),
                 (2, task4.clone())
-            ]
+            ])
         );
 
         Ok(())

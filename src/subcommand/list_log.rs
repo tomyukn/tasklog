@@ -1,26 +1,19 @@
 use crate::db::Database;
-use crate::task::{Task, TaskList, TaskSummary, TimeDisplay, WorkDate};
+use crate::task::{TaskList, TaskSummary, TimeDisplay, WorkDate};
 use anyhow::Result;
 use prettytable::{format, table, Row, Table};
 
 /// Print task log
 pub fn run(db: &Database, show_all: bool, date: Option<String>) -> Result<()> {
     let date = build_date(date, WorkDate::now())?;
-    let tasks_with_seq = db.get_tasks(show_all, Some(date))?;
+    let tasks = db.get_tasks(show_all, Some(date))?;
 
     // show list
-    print_list(tasks_with_seq.clone())?;
-
-    // show details
-    let mut tasks: Vec<Task> = Vec::new();
-
-    for (_, task) in tasks_with_seq {
-        tasks.push(task);
-    }
+    print_list(tasks.clone())?;
 
     // show summary
     if !show_all {
-        if let Some(task_summary) = TaskList::new(tasks).summary() {
+        if let Some(task_summary) = tasks.summary() {
             println!("");
             print_summary(task_summary)?;
         }
@@ -40,7 +33,7 @@ fn build_date(date: Option<String>, default: WorkDate) -> Result<WorkDate> {
 }
 
 // Print task log
-fn print_list(task_list: Vec<(u32, Task)>) -> Result<()> {
+fn print_list(task_list: TaskList) -> Result<()> {
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_CLEAN);
 
