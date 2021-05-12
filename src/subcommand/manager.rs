@@ -16,7 +16,7 @@ pub fn show(db: &Database) -> Result<()> {
     )?;
 
     let manager = db.get_manager()?;
-    println!("{:?}", manager);
+    println!("{:#?}", manager);
 
     Ok(())
 }

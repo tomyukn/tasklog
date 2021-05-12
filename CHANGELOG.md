@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Change subcommand `list` to `log`.
 - Change subcommand `tasks` to `list`.
+- Pretty print `show-manager` subcommand output.
 
 ## [0.4.0] - 2021-05-04
 
