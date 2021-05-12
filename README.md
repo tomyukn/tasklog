@@ -17,7 +17,7 @@ task already exists: task one
 $ tasklog register "task three"
 $ tasklog unregister "task three"
 
-$ tasklog tasks
+$ tasklog list
  No  Task
   1  task one
   2  task two
@@ -40,7 +40,7 @@ task one started at 13:00
 $ tasklog end
 "task one" ended at 14:00
 
-$ tasklog list
+$ tasklog log
  Date        No  Start  End    Duration  Task
  2021-04-10   1  09:17  11:34     02:17  task one
  2021-04-10   2  11:34  11:50     00:16  task two
@@ -65,7 +65,7 @@ $ tasklog list
  ---------------
 
 $ tasklog update 1 start 09:15
-$ tasklog list
+$ tasklog log
  Date        No  Start  End    Duration  Task
  2021-04-10   1  09:15  11:34     02:19  task one
  2021-04-10   2  11:34  11:50     00:16  task two
@@ -95,7 +95,7 @@ Really delete? yes
 
 task 4 deleted
 
-$ tasklog list
+$ tasklog log
  Date        No  Start  End    Duration  Task
  2021-04-10   1  09:15  11:34     02:19  task one
  2021-04-10   2  11:34  11:50     00:16  task two

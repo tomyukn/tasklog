@@ -37,10 +37,10 @@ enum SubCommand {
     Unregister(UnregisterOpts),
 
     #[clap(
-        about = "Shows registered task names",
+        about = "Lists registered task names",
         version = crate_version!()
     )]
-    Tasks,
+    List,
 
     #[clap(
         about = "Starts a task",
@@ -55,10 +55,10 @@ enum SubCommand {
     End(EndOpts),
 
     #[clap(
-        about = "Lists logged task entries",
+        about = "Shows logged task entries",
         version = crate_version!()
     )]
-    List(ListOpts),
+    Log(LogOpts),
 
     #[clap(
         about = "Updates a task entry",
@@ -127,8 +127,8 @@ struct EndOpts {
 }
 
 #[derive(Clap)]
-struct ListOpts {
-    #[clap(short, long, about = "Shows all task logs instead of today's")]
+struct LogOpts {
+    #[clap(short, long, about = "Lists all task logs")]
     all: bool,
     #[clap(short, long, about = "Date shown")]
     date: Option<String>,
@@ -172,9 +172,9 @@ fn main() -> Result<()> {
             subcommand::unregister::run(&mut db, &opts.task_name)?;
         }
 
-        SubCommand::Tasks => {
+        SubCommand::List => {
             let db = Database::connect_r(&db_path)?;
-            subcommand::show_tasks::run(&db)?;
+            subcommand::list_tasks::run(&db)?;
         }
 
         SubCommand::Start(opts) => {
@@ -193,7 +193,7 @@ fn main() -> Result<()> {
             subcommand::end::run(&mut db, opts.time)?;
         }
 
-        SubCommand::List(opts) => {
+        SubCommand::Log(opts) => {
             let db = Database::connect_rw(&db_path)?;
             subcommand::list_log::run(&db, opts.all, opts.date)?;
         }
